@@ -15,13 +15,7 @@ class Trainer:
         self.model_name = model_name
         self.device = device or torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.model.to(self.device)
-
-        self.history = {
-            "train_loss": [],
-            "val_loss": [],
-            "val_acc": [],
-            "val_f1": [],
-        }
+        self.history = {"train_loss": [], "val_loss": [], "val_acc": [], "val_f1": []}
         self.best_val_acc = 0.0
         self.best_state_dict = None
         self.training_time = 0.0
@@ -30,38 +24,31 @@ class Trainer:
     def train_epoch(self, train_loader, optimizer, criterion):
         self.model.train()
         total_loss = 0.0
-
         for data, target in train_loader:
             data, target = data.to(self.device), target.to(self.device)
             optimizer.zero_grad()
-            output = self.model(data)
-            loss = criterion(output, target)
+            loss = criterion(self.model(data), target)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-
         return total_loss / max(len(train_loader), 1)
 
     def validate(self, val_loader, criterion):
         self.model.eval()
         total_loss = 0.0
-        all_preds = []
-        all_labels = []
-
+        preds, labels = [], []
         with torch.no_grad():
             for data, target in val_loader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                loss = criterion(output, target)
-                total_loss += loss.item()
-
-                preds = output.argmax(dim=1)
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(target.cpu().numpy())
-
-        accuracy = accuracy_score(all_labels, all_preds)
-        f1 = f1_score(all_labels, all_preds, average="weighted", zero_division=0)
-        return total_loss / max(len(val_loader), 1), accuracy, f1
+                total_loss += criterion(output, target).item()
+                preds.extend(output.argmax(dim=1).cpu().numpy())
+                labels.extend(target.cpu().numpy())
+        return (
+            total_loss / max(len(val_loader), 1),
+            accuracy_score(labels, preds),
+            f1_score(labels, preds, average="weighted", zero_division=0),
+        )
 
     def fit(
         self,
@@ -72,12 +59,13 @@ class Trainer:
         weight_decay: float = 1e-4,
         early_stopping_patience: int = 5,
     ):
-        optimizer = optim.Adam(self.model.parameters(), lr=lr, weight_decay=weight_decay)
+        trainable = [p for p in self.model.parameters() if p.requires_grad]
+        optimizer = optim.Adam(trainable, lr=lr, weight_decay=weight_decay)
         scheduler = optim.lr_scheduler.ReduceLROnPlateau(optimizer, mode="min", patience=3, factor=0.5)
         criterion = nn.CrossEntropyLoss()
 
-        start_time = time.time()
-        patience_counter = 0
+        start = time.time()
+        patience = 0
 
         for epoch in range(1, epochs + 1):
             train_loss = self.train_epoch(train_loader, optimizer, criterion)
@@ -92,15 +80,14 @@ class Trainer:
             if val_acc > self.best_val_acc:
                 self.best_val_acc = val_acc
                 self.best_epoch = epoch
-                self.best_state_dict = {key: value.cpu().clone() for key, value in self.model.state_dict().items()}
-                patience_counter = 0
+                self.best_state_dict = {k: v.cpu().clone() for k, v in self.model.state_dict().items()}
+                patience = 0
             else:
-                patience_counter += 1
-                if patience_counter >= early_stopping_patience:
+                patience += 1
+                if patience >= early_stopping_patience:
                     break
 
-        self.training_time = time.time() - start_time
-
+        self.training_time = time.time() - start
         if self.best_state_dict:
             self.model.load_state_dict(self.best_state_dict)
 
@@ -112,33 +99,27 @@ class Trainer:
             "best_epoch": self.best_epoch,
         }
 
-    def evaluate(self, test_loader):
+    def evaluate(self, loader):
         self.model.eval()
-        all_preds = []
-        all_labels = []
-
+        preds, labels = [], []
         with torch.no_grad():
-            for data, target in test_loader:
+            for data, target in loader:
                 data, target = data.to(self.device), target.to(self.device)
                 output = self.model(data)
-                preds = output.argmax(dim=1)
-                all_preds.extend(preds.cpu().numpy())
-                all_labels.extend(target.cpu().numpy())
-
+                preds.extend(output.argmax(dim=1).cpu().numpy())
+                labels.extend(target.cpu().numpy())
         return {
-            "accuracy": accuracy_score(all_labels, all_preds),
-            "precision": precision_score(all_labels, all_preds, average="weighted", zero_division=0),
-            "recall": recall_score(all_labels, all_preds, average="weighted", zero_division=0),
-            "f1_score": f1_score(all_labels, all_preds, average="weighted", zero_division=0),
+            "accuracy": accuracy_score(labels, preds),
+            "precision": precision_score(labels, preds, average="weighted", zero_division=0),
+            "recall": recall_score(labels, preds, average="weighted", zero_division=0),
+            "f1_score": f1_score(labels, preds, average="weighted", zero_division=0),
         }
 
     def save_weights_npy(self, save_path: str, metadata: Optional[dict] = None):
-        weights_dict = {name: param.cpu().numpy() for name, param in self.model.state_dict().items()}
-        np.save(save_path, weights_dict)
-
+        weights = {name: p.cpu().numpy() for name, p in self.model.state_dict().items()}
+        np.save(save_path, weights)
         if metadata:
             meta_path = str(save_path).replace(".npy", ".meta.json")
             with open(meta_path, "w", encoding="utf-8") as file:
-                json.dump(metadata, f, indent=2)
-
+                json.dump(metadata, file, indent=2)
         return save_path

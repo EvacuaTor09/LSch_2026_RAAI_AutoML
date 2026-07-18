@@ -28,23 +28,9 @@ class ModelWrapper:
     def get_model(self) -> nn.Module:
         return self.model
 
-    def freeze_backbone(self):
-        for param in self.model.parameters():
-            param.requires_grad = False
-
-        if self.model_type == "resnet" and hasattr(self.model, "fc"):
-            for param in self.model.fc.parameters():
-                param.requires_grad = True
-        elif self.model_type == "vgg" and hasattr(self.model, "classifier"):
-            for param in self.model.classifier.parameters():
-                param.requires_grad = True
-        elif self.model_type == "vit" and hasattr(self.model, "head"):
-            for param in self.model.head.parameters():
-                param.requires_grad = True
-
     def count_parameters(self) -> dict:
-        total = sum(param.numel() for param in self.model.parameters())
-        trainable = sum(param.numel() for param in self.model.parameters() if param.requires_grad)
+        total = sum(p.numel() for p in self.model.parameters())
+        trainable = sum(p.numel() for p in self.model.parameters() if p.requires_grad)
         return {"total": total, "trainable": trainable}
 
     def load_weights_npy(self, weights_path: str):
