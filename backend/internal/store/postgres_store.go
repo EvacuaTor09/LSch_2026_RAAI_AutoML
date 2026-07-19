@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	_ "github.com/jackc/pgx/v5/stdlib"
@@ -181,11 +182,11 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 		id            string
 		createdAt     time.Time
 		status        string
-		models        []string
+		modelsRaw     any
 		datasetPath   string
 		archivePath   string
 		splitRaw      []byte
-		classNames    []string
+		classNamesRaw any
 		resultsRaw    []byte
 		bestModel     string
 		bestAccuracy  float64
@@ -198,11 +199,11 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 		&id,
 		&createdAt,
 		&status,
-		&models,
+		&modelsRaw,
 		&datasetPath,
 		&archivePath,
 		&splitRaw,
-		&classNames,
+		&classNamesRaw,
 		&resultsRaw,
 		&bestModel,
 		&bestAccuracy,
@@ -214,6 +215,14 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 			return domain.Task{}, fmt.Errorf("task not found")
 		}
 		return domain.Task{}, err
+	}
+	models, err := parseStringSliceValue(modelsRaw)
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("decode models: %w", err)
+	}
+	classNames, err := parseStringSliceValue(classNamesRaw)
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("decode class_names: %w", err)
 	}
 
 	var splitConfig domain.SplitConfig
@@ -261,4 +270,66 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 		Error:        errorText,
 		CompletedAt:  completed,
 	}, nil
+}
+
+func parseStringSliceValue(value any) ([]string, error) {
+	switch raw := value.(type) {
+	case nil:
+		return []string{}, nil
+	case []string:
+		return append([]string{}, raw...), nil
+	case string:
+		return parseStringSliceText(raw)
+	case []byte:
+		return parseStringSliceText(string(raw))
+	default:
+		return nil, fmt.Errorf("unsupported list type %T", value)
+	}
+}
+
+func parseStringSliceText(raw string) ([]string, error) {
+	trimmed := strings.TrimSpace(raw)
+	if trimmed == "" {
+		return []string{}, nil
+	}
+
+	// Some DB layouts store arrays as JSON text.
+	if strings.HasPrefix(trimmed, "[") {
+		values := []string{}
+		if err := json.Unmarshal([]byte(trimmed), &values); err != nil {
+			return nil, err
+		}
+		return values, nil
+	}
+
+	// Postgres array text representation: {a,b,c}
+	if strings.HasPrefix(trimmed, "{") && strings.HasSuffix(trimmed, "}") {
+		body := strings.TrimSpace(trimmed[1 : len(trimmed)-1])
+		if body == "" {
+			return []string{}, nil
+		}
+		parts := strings.Split(body, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			item := strings.Trim(strings.TrimSpace(part), `"`)
+			if item != "" {
+				values = append(values, item)
+			}
+		}
+		return values, nil
+	}
+
+	if strings.Contains(trimmed, ",") {
+		parts := strings.Split(trimmed, ",")
+		values := make([]string, 0, len(parts))
+		for _, part := range parts {
+			item := strings.TrimSpace(part)
+			if item != "" {
+				values = append(values, item)
+			}
+		}
+		return values, nil
+	}
+
+	return []string{trimmed}, nil
 }

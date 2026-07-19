@@ -1,13 +1,15 @@
 package dataset
 
 import (
-	"archive/zip"
+	"context"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/mholt/archives"
 
 	"lsch2026/backend/internal/domain"
 )
@@ -21,19 +23,17 @@ func NewService(baseDir string) *Service {
 }
 
 func (s *Service) InspectClasses(archivePath string) ([]string, error) {
-	reader, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return nil, err
-	}
-	defer reader.Close()
-
 	classes := map[string]struct{}{}
-	for _, file := range reader.File {
-		className, ok := classFromPath(file.Name)
+	err := walkArchive(archivePath, func(name string, _ func() (io.ReadCloser, error)) error {
+		className, ok := classFromPath(name)
 		if !ok {
-			continue
+			return nil
 		}
 		classes[className] = struct{}{}
+		return nil
+	})
+	if err != nil {
+		return nil, err
 	}
 
 	result := make([]string, 0, len(classes))
@@ -72,7 +72,8 @@ func (s *Service) copyArchive(taskDir, archivePath string) error {
 	}
 	defer input.Close()
 
-	output, err := os.Create(filepath.Join(taskDir, "dataset.zip"))
+	archiveName := "dataset" + filepath.Ext(archivePath)
+	output, err := os.Create(filepath.Join(taskDir, archiveName))
 	if err != nil {
 		return err
 	}
@@ -83,12 +84,6 @@ func (s *Service) copyArchive(taskDir, archivePath string) error {
 }
 
 func (s *Service) unpackAndSplit(taskDir, archivePath string, split domain.SplitConfig) error {
-	reader, err := zip.OpenReader(archivePath)
-	if err != nil {
-		return err
-	}
-	defer reader.Close()
-
 	targetRoots := map[string]string{
 		"train": filepath.Join(taskDir, "train"),
 		"val":   filepath.Join(taskDir, "val"),
@@ -100,36 +95,56 @@ func (s *Service) unpackAndSplit(taskDir, archivePath string, split domain.Split
 		}
 	}
 
-	filesByClass := map[string][]*zip.File{}
-	for _, file := range reader.File {
-		if file.FileInfo().IsDir() {
-			continue
-		}
-		className, ok := classFromPath(file.Name)
+	filesByClass := map[string][]string{}
+	err := walkArchive(archivePath, func(name string, _ func() (io.ReadCloser, error)) error {
+		className, ok := classFromPath(name)
 		if !ok {
-			continue
+			return nil
 		}
-		filesByClass[className] = append(filesByClass[className], file)
+		filesByClass[className] = append(filesByClass[className], name)
+		return nil
+	})
+	if err != nil {
+		return err
 	}
 
+	segmentByName := map[string]string{}
+	classByName := map[string]string{}
 	for className, files := range filesByClass {
-		sort.Slice(files, func(i, j int) bool {
-			return files[i].Name < files[j].Name
-		})
+		sort.Strings(files)
 		classSplit := split.Default
 		if override, ok := split.Classes[className]; ok {
 			classSplit = override
 		}
-		if err := copySplitFiles(files, targetRoots, className, classSplit); err != nil {
-			return err
+		segments := splitByRatio(files, classSplit)
+		for segmentName, segmentFiles := range segments {
+			for _, name := range segmentFiles {
+				segmentByName[name] = segmentName
+				classByName[name] = className
+			}
 		}
 	}
-	return nil
+
+	return walkArchive(archivePath, func(name string, open func() (io.ReadCloser, error)) error {
+		segment, ok := segmentByName[name]
+		if !ok {
+			return nil
+		}
+		className := classByName[name]
+		if err := extractFile(name, open, filepath.Join(targetRoots[segment], className)); err != nil {
+			return err
+		}
+		return nil
+	})
 }
 
-func copySplitFiles(files []*zip.File, targetRoots map[string]string, className string, split domain.SplitRatio) error {
+func splitByRatio(files []string, split domain.SplitRatio) map[string][]string {
 	if len(files) == 0 {
-		return nil
+		return map[string][]string{
+			"train": nil,
+			"val":   nil,
+			"test":  nil,
+		}
 	}
 
 	trainCount := int(float64(len(files)) * split.Train / 100)
@@ -148,37 +163,25 @@ func copySplitFiles(files []*zip.File, targetRoots map[string]string, className 
 		testCount = 0
 	}
 
-	segments := []struct {
-		name  string
-		files []*zip.File
-	}{
-		{name: "train", files: files[:trainCount]},
-		{name: "val", files: files[trainCount : trainCount+valCount]},
-		{name: "test", files: files[trainCount+valCount : trainCount+valCount+testCount]},
+	return map[string][]string{
+		"train": files[:trainCount],
+		"val":   files[trainCount : trainCount+valCount],
+		"test":  files[trainCount+valCount : trainCount+valCount+testCount],
 	}
-
-	for _, segment := range segments {
-		for _, file := range segment.files {
-			if err := extractFile(file, filepath.Join(targetRoots[segment.name], className)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
 }
 
-func extractFile(file *zip.File, targetDir string) error {
+func extractFile(name string, open func() (io.ReadCloser, error), targetDir string) error {
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return err
 	}
 
-	reader, err := file.Open()
+	reader, err := open()
 	if err != nil {
 		return err
 	}
 	defer reader.Close()
 
-	outputPath := filepath.Join(targetDir, filepath.Base(file.Name))
+	outputPath := filepath.Join(targetDir, filepath.Base(name))
 	output, err := os.Create(outputPath)
 	if err != nil {
 		return err
@@ -187,6 +190,40 @@ func extractFile(file *zip.File, targetDir string) error {
 
 	_, err = io.Copy(output, reader)
 	return err
+}
+
+func walkArchive(archivePath string, visit func(name string, open func() (io.ReadCloser, error)) error) error {
+	file, err := os.Open(archivePath)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	format, stream, err := archives.Identify(context.Background(), filepath.Base(archivePath), file)
+	if err != nil {
+		return fmt.Errorf("unsupported archive format: %w", err)
+	}
+	extractor, ok := format.(archives.Extractor)
+	if !ok {
+		return fmt.Errorf("unsupported archive format: extractor is not available")
+	}
+
+	return extractor.Extract(context.Background(), stream, func(_ context.Context, entry archives.FileInfo) error {
+		if entry.IsDir() {
+			return nil
+		}
+		return visit(entry.NameInArchive, func() (io.ReadCloser, error) {
+			f, err := entry.Open()
+			if err != nil {
+				return nil, err
+			}
+			reader, ok := f.(io.ReadCloser)
+			if ok {
+				return reader, nil
+			}
+			return io.NopCloser(f), nil
+		})
+	})
 }
 
 func classFromPath(name string) (string, bool) {

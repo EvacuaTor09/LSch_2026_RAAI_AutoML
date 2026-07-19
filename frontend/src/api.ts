@@ -1,6 +1,17 @@
 import type { ModelName, SplitConfig, TaskResult } from './types';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:8080';
+function resolveApiURL(): string {
+  const fromEnv = import.meta.env.VITE_API_URL?.trim();
+  if (fromEnv) {
+    return fromEnv;
+  }
+  if (typeof window !== 'undefined') {
+    return `${window.location.protocol}//${window.location.hostname}:8080`;
+  }
+  return 'http://localhost:8080';
+}
+
+const API_URL = resolveApiURL();
 
 export async function inspectDataset(file: File): Promise<string[]> {
   const formData = new FormData();

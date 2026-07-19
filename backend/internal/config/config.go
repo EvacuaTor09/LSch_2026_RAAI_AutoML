@@ -1,9 +1,10 @@
 package config
 
 import (
-	"strconv"
 	"os"
+	"strconv"
 	"strings"
+	"time"
 )
 
 type Config struct {
@@ -25,6 +26,7 @@ type Config struct {
 	BatchSize     int
 	ImageSize     int
 	LearningRate  float64
+	ModelRequestTimeout time.Duration
 	LockTTLMillis int
 }
 
@@ -44,6 +46,7 @@ func Load() Config {
 		BatchSize:      envOrInt("BATCH_SIZE", 32),
 		ImageSize:      envOrInt("IMAGE_SIZE", 224),
 		LearningRate:   envOrFloat("LEARNING_RATE", 0.001),
+		ModelRequestTimeout: envOrDuration("MODEL_REQUEST_TIMEOUT", 3*time.Hour),
 		LockTTLMillis:  envOrInt("REPLICA_LOCK_TTL_MS", 30*60*1000),
 	}
 }
@@ -89,6 +92,21 @@ func envOrList(key string, fallback []string) []string {
 		return append([]string{}, fallback...)
 	}
 	return result
+}
+
+func envOrDuration(key string, fallback time.Duration) time.Duration {
+	value := strings.TrimSpace(os.Getenv(key))
+	if value == "" {
+		return fallback
+	}
+	parsed, err := time.ParseDuration(value)
+	if err != nil {
+		return fallback
+	}
+	if parsed <= 0 {
+		return fallback
+	}
+	return parsed
 }
 
 func parseInt(value string, fallback int) int {

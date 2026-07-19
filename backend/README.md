@@ -25,6 +25,8 @@ Go backend for the AutoML workflow.
 
 - `HTTP_ADDR` - server address, default `:8080`
 - `DATA_DIR` - storage directory, default `./storage`
-- `RESNET_URL` - model service endpoint
-- `VGG_URL` - model service endpoint
-- `VIT_URL` - model service endpoint
+- `RESNET_REPLICAS` - comma-separated ResNet endpoints
+- `VGG_REPLICAS` - comma-separated VGG endpoints
+- `VIT_REPLICAS` - comma-separated ViT endpoints
+- `MODEL_REQUEST_TIMEOUT` - max duration of one `/train` request (Go duration, e.g. `3h`)
+- `REPLICA_LOCK_TTL_MS` - replica lock TTL in milliseconds; should exceed the request timeout

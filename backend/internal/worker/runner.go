@@ -6,6 +6,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"lsch2026/backend/internal/config"
@@ -43,16 +44,16 @@ func (r *Runner) Run(ctx context.Context, task domain.Task, modelName domain.Mod
 }
 
 func endpointForModel(cfg config.Config, modelName domain.ModelName) string {
+	var replicas []string
 	switch modelName {
 	case domain.ModelResNet50:
-		return cfg.ResNetURL
+		replicas = cfg.ResNetReplicas
 	case domain.ModelVGG16:
-		return cfg.VGGURL
+		replicas = cfg.VGGReplicas
 	case domain.ModelViT:
-		return cfg.ViTURL
-	default:
-		return ""
+		replicas = cfg.ViTReplicas
 	}
+	return strings.Join(replicas, ",")
 }
 
 func hashToSeed(value string) int64 {

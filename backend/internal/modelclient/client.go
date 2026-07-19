@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strings"
 	"time"
@@ -21,9 +22,13 @@ type Client struct {
 }
 
 func NewClient(cfg config.Config, redisClient *redis.Client) *Client {
+	timeout := cfg.ModelRequestTimeout
+	if timeout <= 0 {
+		timeout = 3 * time.Hour
+	}
 	return &Client{
 		cfg:        cfg,
-		httpClient: &http.Client{Timeout: 90 * time.Minute},
+		httpClient: &http.Client{Timeout: timeout},
 		redis:      redisClient,
 	}
 }
@@ -39,6 +44,7 @@ func (c *Client) Train(ctx context.Context, task domain.Task, modelName domain.M
 		return domain.ModelResult{}, err
 	}
 	defer release()
+	log.Printf("modelclient: task=%s model=%s acquired replica endpoint=%s", task.ID, modelName, endpoint)
 
 	requestPayload := map[string]any{
 		"task_id":       task.ID,
@@ -64,9 +70,11 @@ func (c *Client) Train(ctx context.Context, task domain.Task, modelName domain.M
 
 	response, err := c.httpClient.Do(request)
 	if err != nil {
+		log.Printf("modelclient: task=%s model=%s request error endpoint=%s err=%v", task.ID, modelName, endpoint, err)
 		return domain.ModelResult{}, err
 	}
 	defer response.Body.Close()
+	log.Printf("modelclient: task=%s model=%s response status=%d endpoint=%s", task.ID, modelName, response.StatusCode, endpoint)
 
 	var payload struct {
 		Status        string         `json:"status"`
@@ -132,8 +140,16 @@ func (c *Client) acquireReplica(ctx context.Context, modelName string, replicas 
 	if lockTTL <= 0 {
 		lockTTL = 30 * time.Minute
 	}
+	minLockTTL := c.httpClient.Timeout + 5*time.Minute
+	if lockTTL < minLockTTL {
+		lockTTL = minLockTTL
+	}
+	waitDeadline := time.Now().Add(2 * time.Minute)
 
 	for {
+		if time.Now().After(waitDeadline) {
+			return "", nil, fmt.Errorf("timed out waiting for free replica for %s", modelName)
+		}
 		for index, endpoint := range replicas {
 			lockKey := fmt.Sprintf("replica-lock:%s:%d", modelName, index)
 			token := fmt.Sprintf("%s-%d", modelName, time.Now().UnixNano())

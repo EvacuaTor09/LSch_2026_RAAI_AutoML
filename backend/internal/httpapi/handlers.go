@@ -146,6 +146,9 @@ func (h *Handlers) saveUploadedArchive(r *http.Request) (string, func(), error) 
 		return "", func() {}, fmt.Errorf("archive file is required")
 	}
 	defer file.Close()
+	if !isSupportedArchive(header.Filename) {
+		return "", func() {}, fmt.Errorf("unsupported archive format: use zip, jar, tar, tgz, tar.gz, rar or 7z")
+	}
 
 	tmpDir := filepath.Join(h.cfg.DataDir, "_tmp")
 	if err := os.MkdirAll(tmpDir, 0o755); err != nil {
@@ -170,6 +173,19 @@ func (h *Handlers) saveUploadedArchive(r *http.Request) (string, func(), error) 
 		_ = os.Remove(path)
 	}
 	return path, cleanup, nil
+}
+
+func isSupportedArchive(filename string) bool {
+	name := strings.ToLower(strings.TrimSpace(filename))
+	if strings.HasSuffix(name, ".tar.gz") || strings.HasSuffix(name, ".tgz") {
+		return true
+	}
+	switch filepath.Ext(name) {
+	case ".zip", ".jar", ".tar", ".rar", ".7z":
+		return true
+	default:
+		return false
+	}
 }
 
 func parseModels(raw string) ([]domain.ModelName, error) {

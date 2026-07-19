@@ -56,11 +56,23 @@ async def train_model(request_data: dict):
         learning_rate = float(request_data.get("learning_rate", 0.001))
         batch_size = int(request_data.get("batch_size", 32))
         image_size = int(request_data.get("image_size", 224))
+        print(
+            f"[server:{MODEL_NAME}] train start task_id={task_id} dataset_path={dataset_path} "
+            f"epochs={epochs} batch_size={batch_size} image_size={image_size}",
+            flush=True,
+        )
 
         train_loader, val_loader, test_loader, detected_classes = create_dataloaders(
             dataset_path=str(dataset_path),
             batch_size=batch_size,
             image_size=image_size,
+        )
+        print(
+            f"[server:{MODEL_NAME}] dataloaders ready: "
+            f"train_batches={len(train_loader)} val_batches={len(val_loader)} "
+            f"test_batches={(len(test_loader) if test_loader is not None else 0)} "
+            f"detected_classes={len(detected_classes)}",
+            flush=True,
         )
 
         class_names = request_data.get("class_names") or detected_classes
@@ -102,6 +114,11 @@ async def train_model(request_data: dict):
             "history": training_result["history"],
         }
         trainer.save_weights_npy(str(weights_path), metadata)
+        print(
+            f"[server:{MODEL_NAME}] train done task_id={task_id} "
+            f"acc={metrics['accuracy']:.4f} best_epoch={training_result['best_epoch']}",
+            flush=True,
+        )
 
         return {
             "status": "success",

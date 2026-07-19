@@ -173,7 +173,7 @@ export function App() {
           <h2>1. Архив датасета</h2>
           <input
             type="file"
-            accept=".zip"
+            accept=".zip,.jar,.tar,.tgz,.tar.gz,.rar,.7z"
             onChange={(event) => {
               setArchive(event.target.files?.[0] ?? null);
               setStatus('');
@@ -189,7 +189,7 @@ export function App() {
               Создать задачу
             </button>
           </div>
-          <p className="muted">Формат архива: каждая подпапка внутри zip — это отдельный класс.</p>
+          <p className="muted">Поддержка: zip, jar, tar, tgz, tar.gz, rar, 7z. Каждый верхний каталог — отдельный класс.</p>
         </section>
 
         <section className="panel">
