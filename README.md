@@ -1,6 +1,42 @@
 # LSch_2026_RAAI_AutoML
 AutoML project for summer school from RAAI.
 
+## Stack
+
+- Go backend that stores tasks in Postgres and queues them in Redis
+- worker process that consumes tasks, picks a free model replica, and stores the best result
+- React frontend for model selection, ZIP upload, and split editing
+- 3 replicas for each model family: ResNet-50, VGG-16, and ViT-B/16
+
+## Run the whole stack
+
+```bash
+docker compose up --build
+```
+
+Services:
+
+- frontend: http://localhost:5173
+- backend: http://localhost:8080
+- postgres: localhost:5432
+- redis: localhost:6379
+
+The worker picks tasks from Redis, sends each selected model to a free replica, waits for all results, and stores the best one by test accuracy.
+
+## Current structure
+
+- `backend/` - Go API, task queue, dataset split preparation, worker orchestration
+- `frontend/` - React UI for model selection, archive upload, and split editing
+- `models_containers/` - existing model services for ResNet, VGG, and ViT
+
+## Workflow
+
+1. The user uploads a ZIP archive where each subfolder is a class.
+2. The frontend lets the user choose the models and edit the 60/30/10 split or per-class overrides.
+3. The backend stores the task, prepares the dataset split, and enqueues the task.
+4. Workers pick a free replica for each selected model, run training, and store the best result by accuracy.
+5. The frontend polls task status and shows the best model plus its parameters.
+
 
 ## Список литературы
 

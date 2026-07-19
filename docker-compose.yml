@@ -1,0 +1,233 @@
+x-model-base: &model-base
+  build:
+    context: ./models_containers
+    dockerfile: Dockerfile
+  restart: unless-stopped
+  networks:
+    - automl_net
+  environment:
+    DOWNLOAD_MODELS: "True"
+    MODELS_CACHE_DIR: /app/models_cache
+    DATA_DIR: /app/data
+    PYTHONUNBUFFERED: "1"
+    PORT: "8000"
+  volumes:
+    - ./models_containers/models_cache:/app/models_cache
+    - ./models_containers/results:/app/results
+    - ./models_containers/data:/app/data
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: automl
+      POSTGRES_PASSWORD: automl
+      POSTGRES_DB: automl
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - automl_net
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - automl_net
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    depends_on:
+      - postgres
+      - redis
+      - resnet-1
+      - resnet-2
+      - resnet-3
+      - vgg-1
+      - vgg-2
+      - vgg-3
+      - vit-1
+      - vit-2
+      - vit-3
+    environment:
+      HTTP_ADDR: ":8080"
+      DATA_DIR: /app/storage
+      POSTGRES_DSN: postgres://automl:automl@postgres:5432/automl?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      RESNET_REPLICAS: http://resnet-1:8000,http://resnet-2:8000,http://resnet-3:8000
+      VGG_REPLICAS: http://vgg-1:8000,http://vgg-2:8000,http://vgg-3:8000
+      VIT_REPLICAS: http://vit-1:8000,http://vit-2:8000,http://vit-3:8000
+      TRAIN_EPOCHS: "10"
+      BATCH_SIZE: "32"
+      IMAGE_SIZE: "224"
+      LEARNING_RATE: "0.001"
+      REPLICA_LOCK_TTL_MS: "1800000"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./backend/storage:/app/storage
+    networks:
+      - automl_net
+
+  worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    command: ["/app/worker"]
+    depends_on:
+      - postgres
+      - redis
+      - backend
+    environment:
+      DATA_DIR: /app/storage
+      POSTGRES_DSN: postgres://automl:automl@postgres:5432/automl?sslmode=disable
+      REDIS_ADDR: redis:6379
+      REDIS_PASSWORD: ""
+      REDIS_DB: "0"
+      RESNET_REPLICAS: http://resnet-1:8000,http://resnet-2:8000,http://resnet-3:8000
+      VGG_REPLICAS: http://vgg-1:8000,http://vgg-2:8000,http://vgg-3:8000
+      VIT_REPLICAS: http://vit-1:8000,http://vit-2:8000,http://vit-3:8000
+      TRAIN_EPOCHS: "10"
+      BATCH_SIZE: "32"
+      IMAGE_SIZE: "224"
+      LEARNING_RATE: "0.001"
+      REPLICA_LOCK_TTL_MS: "1800000"
+    volumes:
+      - ./backend/storage:/app/storage
+    networks:
+      - automl_net
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    depends_on:
+      - backend
+    environment:
+      VITE_API_URL: http://localhost:8080
+    ports:
+      - "5173:5173"
+    networks:
+      - automl_net
+
+  resnet-1:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: resnet50
+      MODEL_TYPE: resnet
+      WEIGHTS_DIR: /app/results/weights/resnet
+
+  resnet-2:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: resnet50
+      MODEL_TYPE: resnet
+      WEIGHTS_DIR: /app/results/weights/resnet
+
+  resnet-3:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: resnet50
+      MODEL_TYPE: resnet
+      WEIGHTS_DIR: /app/results/weights/resnet
+
+  vgg-1:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: vgg16
+      MODEL_TYPE: vgg
+      WEIGHTS_DIR: /app/results/weights/vgg
+
+  vgg-2:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: vgg16
+      MODEL_TYPE: vgg
+      WEIGHTS_DIR: /app/results/weights/vgg
+
+  vgg-3:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: vgg16
+      MODEL_TYPE: vgg
+      WEIGHTS_DIR: /app/results/weights/vgg
+
+  vit-1:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: vit_base_patch16_224
+      MODEL_TYPE: vit
+      WEIGHTS_DIR: /app/results/weights/vit
+
+  vit-2:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: vit_base_patch16_224
+      MODEL_TYPE: vit
+      WEIGHTS_DIR: /app/results/weights/vit
+
+  vit-3:
+    <<: *model-base
+    environment:
+      DOWNLOAD_MODELS: "True"
+      MODELS_CACHE_DIR: /app/models_cache
+      DATA_DIR: /app/data
+      PYTHONUNBUFFERED: "1"
+      PORT: "8000"
+      MODEL_NAME: vit_base_patch16_224
+      MODEL_TYPE: vit
+      WEIGHTS_DIR: /app/results/weights/vit
+
+networks:
+  automl_net:
+    name: automl_net
+    driver: bridge
+
+volumes:
+  postgres_data:
