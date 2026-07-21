@@ -71,6 +71,12 @@ class Trainer:
             train_loss = self.train_epoch(train_loader, optimizer, criterion)
             val_loss, val_acc, val_f1 = self.validate(val_loader, criterion)
             scheduler.step(val_loss)
+            print(
+                f"[trainer:{self.model_name}] epoch {epoch}/{epochs} "
+                f"train_loss={train_loss:.4f} val_loss={val_loss:.4f} "
+                f"val_acc={val_acc:.4f} val_f1={val_f1:.4f}",
+                flush=True,
+            )
 
             self.history["train_loss"].append(train_loss)
             self.history["val_loss"].append(val_loss)
@@ -85,11 +91,22 @@ class Trainer:
             else:
                 patience += 1
                 if patience >= early_stopping_patience:
+                    print(
+                        f"[trainer:{self.model_name}] early stopping at epoch {epoch} "
+                        f"(patience={early_stopping_patience})",
+                        flush=True,
+                    )
                     break
 
         self.training_time = time.time() - start
         if self.best_state_dict:
             self.model.load_state_dict(self.best_state_dict)
+        print(
+            f"[trainer:{self.model_name}] finished: epochs={len(self.history['train_loss'])} "
+            f"best_epoch={self.best_epoch} best_val_acc={self.best_val_acc:.4f} "
+            f"time_sec={self.training_time:.1f}",
+            flush=True,
+        )
 
         return {
             "history": self.history,
