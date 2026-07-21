@@ -6,8 +6,8 @@ WORKDIR /src
 ENV GOTOOLCHAIN=local
 COPY go.mod ./
 COPY . .
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/api ./cmd/api && \
-    CGO_ENABLED=0 GOOS=linux go build -o /out/worker ./cmd/worker
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o /out/api ./cmd/api && \
+    CGO_ENABLED=0 GOOS=linux go build -mod=mod -o /out/worker ./cmd/worker
 
 FROM gcr.io/distroless/base-debian12
 WORKDIR /app
