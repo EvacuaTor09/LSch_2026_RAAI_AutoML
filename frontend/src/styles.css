@@ -415,9 +415,11 @@ label {
   padding-top: 0;
 }
 
-.class-item strong {
-  cursor: grab;
-  text-align: left;
+.class-item-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 0.75rem;
 }
 
 .split-row {

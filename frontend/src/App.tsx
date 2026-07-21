@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import type { ChangeEvent, DragEvent, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent } from 'react';
 import {
   clearAuthToken,
   createTask,
@@ -60,15 +60,6 @@ export function App() {
     () => ({ default: defaultSplit, classes: classSplits }),
     [defaultSplit, classSplits],
   );
-
-  const classBuckets = useMemo(() => {
-    const buckets: Record<'train' | 'val' | 'test', string[]> = { train: [], val: [], test: [] };
-    for (const className of classes) {
-      const split = classSplits[className] ?? DEFAULT_SPLIT;
-      buckets[dominantSplit(split)].push(className);
-    }
-    return buckets;
-  }, [classes, classSplits]);
 
   const useTrainedPredict = Boolean(task && task.status === 'completed');
   const predictModels = useMemo(
@@ -186,7 +177,7 @@ export function App() {
         const next = { ...previous };
         for (const className of discovered) {
           if (!next[className]) {
-            next[className] = DEFAULT_SPLIT;
+            next[className] = { ...defaultSplit };
           }
         }
         return next;
@@ -256,31 +247,14 @@ export function App() {
     );
   }
 
-  function setClassBucket(className: string, bucket: 'train' | 'val' | 'test') {
-    const nextSplit =
-      bucket === 'train'
-        ? { train: 100, val: 0, test: 0 }
-        : bucket === 'val'
-          ? { train: 0, val: 100, test: 0 }
-          : { train: 0, val: 0, test: 100 };
-
-    setClassSplits((current) => ({
-      ...current,
-      [className]: nextSplit,
-    }));
-  }
-
-  function handleDragStart(event: DragEvent<HTMLElement>, className: string) {
-    event.dataTransfer.setData('text/plain', className);
-    event.dataTransfer.effectAllowed = 'move';
-  }
-
-  function handleDrop(event: DragEvent<HTMLDivElement>, bucket: 'train' | 'val' | 'test') {
-    event.preventDefault();
-    const className = event.dataTransfer.getData('text/plain');
-    if (className) {
-      setClassBucket(className, bucket);
-    }
+  function applyDefaultToAllClasses() {
+    setClassSplits(() => {
+      const next: Record<string, SplitRatio> = {};
+      for (const className of classes) {
+        next[className] = { ...defaultSplit };
+      }
+      return next;
+    });
   }
 
   if (authLoading) {
@@ -402,74 +376,62 @@ export function App() {
         <section className="section">
           <div className="section-head">
             <h2>Разбиение</h2>
-            <p>Задай train / val / test и перетащи классы по корзинам.</p>
+            <p>
+              Доли фотографий внутри каждого класса: train / val / test. По умолчанию одно и то же для всех, ниже
+              можно поправить отдельно.
+            </p>
           </div>
           <div className="split-row">
             {SPLIT_KEYS.map((field) => (
               <label key={field}>
-                {field}
+                {field}, %
                 <input
                   type="number"
                   min={0}
                   max={100}
                   value={defaultSplit[field]}
-                  onChange={(event) =>
-                    setDefaultSplit((current) => ({
-                      ...current,
-                      [field]: Number(event.target.value),
-                    }))
-                  }
+                  onChange={(event) => {
+                    const value = Number(event.target.value);
+                    const nextDefault = { ...defaultSplit, [field]: value };
+                    setDefaultSplit(nextDefault);
+                    setClassSplits((current) => {
+                      const next: Record<string, SplitRatio> = { ...current };
+                      for (const className of classes) {
+                        next[className] = { ...nextDefault };
+                      }
+                      return next;
+                    });
+                  }}
                 />
               </label>
             ))}
           </div>
-          <div className="bucket-grid">
-            {SPLIT_KEYS.map((bucket) => (
-              <div
-                className="bucket"
-                key={bucket}
-                onDragOver={(event) => event.preventDefault()}
-                onDrop={(event) => handleDrop(event, bucket)}
-              >
-                <div className="bucket-head">
-                  <strong>{bucket}</strong>
-                  <span>{classBuckets[bucket].length}</span>
-                </div>
-                <div className="chip-row">
-                  {classBuckets[bucket].length === 0 ? (
-                    <p className="muted">Перетащи класс</p>
-                  ) : (
-                    classBuckets[bucket].map((className) => (
-                      <div
-                        className="class-chip"
-                        draggable
-                        key={className}
-                        onDragStart={(event) => handleDragStart(event, className)}
-                        onDoubleClick={() => setClassBucket(className, bucket)}
-                      >
-                        {className}
-                      </div>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))}
+          <div className="actions">
+            <button type="button" onClick={applyDefaultToAllClasses} disabled={!classes.length}>
+              Сбросить классы к умолчанию
+            </button>
           </div>
+          <p className="muted">
+            В каждом классе фото делятся так: {defaultSplit.train}% train / {defaultSplit.val}% val /{' '}
+            {defaultSplit.test}% test.
+          </p>
           <div className="class-list">
             {classes.length === 0 ? (
               <p className="muted">Сначала найди классы в архиве.</p>
             ) : (
               classes.map((className) => {
-                const split = classSplits[className] ?? DEFAULT_SPLIT;
+                const split = classSplits[className] ?? defaultSplit;
+                const total = split.train + split.val + split.test;
                 return (
                   <div className="class-item" key={className}>
-                    <strong draggable onDragStart={(event) => handleDragStart(event, className)}>
-                      {className}
-                    </strong>
+                    <div className="class-item-head">
+                      <strong>{className}</strong>
+                      <span className={total === 100 ? 'muted' : 'error'}>сумма {total}%</span>
+                    </div>
                     <div className="split-row">
                       {SPLIT_KEYS.map((field) => (
                         <label key={field}>
-                          {field}
+                          {field}, %
                           <input
                             type="number"
                             min={0}
@@ -743,14 +705,4 @@ function formatDuration(value?: number): string {
     return 'n/a';
   }
   return `${value.toFixed(1)}s`;
-}
-
-function dominantSplit(split: SplitRatio): 'train' | 'val' | 'test' {
-  if (split.val >= split.train && split.val >= split.test) {
-    return 'val';
-  }
-  if (split.test >= split.train && split.test >= split.val) {
-    return 'test';
-  }
-  return 'train';
 }
