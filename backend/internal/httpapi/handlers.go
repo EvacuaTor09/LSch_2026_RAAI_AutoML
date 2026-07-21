@@ -60,6 +60,27 @@ func (h *Handlers) Login(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]any{"token": token, "username": strings.TrimSpace(payload.Username)})
 }
 
+func (h *Handlers) Register(w http.ResponseWriter, r *http.Request) {
+	if h.auth == nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("auth is not configured"))
+		return
+	}
+	var payload struct {
+		Username string `json:"username"`
+		Password string `json:"password"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&payload); err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("invalid register payload"))
+		return
+	}
+	token, err := h.auth.Register(r.Context(), payload.Username, payload.Password)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	writeJSON(w, http.StatusCreated, map[string]any{"token": token, "username": strings.TrimSpace(payload.Username)})
+}
+
 func (h *Handlers) Me(w http.ResponseWriter, r *http.Request) {
 	username, _ := auth.UsernameFromContext(r.Context())
 	if username == "" {
@@ -217,6 +238,39 @@ func (h *Handlers) PredictTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	result, err := h.modelClient.Predict(r.Context(), endpoint, header.Filename, data)
+	if err != nil {
+		writeError(w, http.StatusBadGateway, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, result)
+}
+
+func (h *Handlers) PredictPretrained(w http.ResponseWriter, r *http.Request) {
+	if h.modelClient == nil {
+		writeError(w, http.StatusInternalServerError, fmt.Errorf("model client is not configured"))
+		return
+	}
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("file is required"))
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(file)
+	if err != nil {
+		writeError(w, http.StatusBadRequest, err)
+		return
+	}
+	modelName := strings.TrimSpace(r.URL.Query().Get("model"))
+	if modelName == "" {
+		writeError(w, http.StatusBadRequest, fmt.Errorf("model is required"))
+		return
+	}
+	result, err := h.modelClient.PredictPretrained(r.Context(), modelName, header.Filename, data)
 	if err != nil {
 		writeError(w, http.StatusBadGateway, err)
 		return

@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"database/sql"
 	"net/http"
 	"strings"
 	"time"
@@ -67,6 +68,27 @@ func (s *Service) BootstrapUser(ctx context.Context, username, password string) 
 		return err
 	}
 	return s.store.UpsertUser(ctx, User{Username: username, PasswordHash: string(hash)})
+}
+
+func (s *Service) Register(ctx context.Context, username, password string) (string, error) {
+	username = strings.TrimSpace(username)
+	password = strings.TrimSpace(password)
+	if username == "" || password == "" {
+		return "", fmt.Errorf("username and password are required")
+	}
+	if _, err := s.store.GetUser(ctx, username); err == nil {
+		return "", fmt.Errorf("user already exists")
+	} else if !errors.Is(err, sql.ErrNoRows) {
+		return "", err
+	}
+	hash, err := hashPassword(password)
+	if err != nil {
+		return "", err
+	}
+	if err := s.store.UpsertUser(ctx, User{Username: username, PasswordHash: string(hash)}); err != nil {
+		return "", err
+	}
+	return s.Login(ctx, username, password)
 }
 
 func (s *Service) Login(ctx context.Context, username, password string) (string, error) {

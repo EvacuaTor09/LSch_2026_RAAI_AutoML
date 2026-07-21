@@ -125,7 +125,7 @@ func (s *PostgresStore) GetUser(ctx context.Context, username string) (auth.User
 	var user auth.User
 	if err := row.Scan(&user.Username, &user.PasswordHash); err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return auth.User{}, fmt.Errorf("user not found")
+			return auth.User{}, sql.ErrNoRows
 		}
 		return auth.User{}, err
 	}

@@ -31,6 +31,15 @@ model_wrapper: Optional[ModelWrapper] = None
 num_classes = 0
 class_names: List[str] = []
 
+
+def ensure_model_wrapper_for_predict() -> ModelWrapper:
+    global model_wrapper, num_classes, class_names
+    if model_wrapper is None:
+        model_wrapper = ModelWrapper(model_name=MODEL_NAME, model_type=MODEL_TYPE, num_classes=1000)
+        num_classes = 1000
+        class_names = []
+    return model_wrapper
+
 inference_transform = transforms.Compose(
     [
         transforms.Resize(256),
@@ -151,11 +160,10 @@ async def train_model(request_data: dict):
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
     """Single-image inference (assignment: predict with each model)."""
-    if model_wrapper is None:
-        raise HTTPException(400, "model is not trained yet; call POST /train first")
+    wrapper = ensure_model_wrapper_for_predict()
 
     try:
-        model = model_wrapper.get_model()
+        model = wrapper.get_model()
         model.eval()
 
         image = Image.open(io.BytesIO(await file.read())).convert("RGB")
@@ -167,7 +175,7 @@ async def predict(file: UploadFile = File(...)):
             pred = int(output.argmax(dim=1).item())
             confidence = float(probs[pred].item())
 
-        name = class_names[pred] if pred < len(class_names) else str(pred)
+        name = class_names[pred] if class_names and pred < len(class_names) else str(pred)
         return {
             "model": MODEL_NAME,
             "model_type": MODEL_TYPE,

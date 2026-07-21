@@ -37,11 +37,6 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 	}
 
 	authService := auth.NewService(storeConn, cfg.JWTSecret, cfg.TokenTTL)
-	if err := authService.BootstrapUser(ctx, cfg.AdminUsername, cfg.AdminPassword); err != nil {
-		_ = redisClient.Close()
-		_ = storeConn.Close()
-		return nil, fmt.Errorf("init auth user: %w", err)
-	}
 
 	datasetService := dataset.NewService(cfg.DataDir)
 	modelClient := modelclient.NewClient(cfg, redisClient)

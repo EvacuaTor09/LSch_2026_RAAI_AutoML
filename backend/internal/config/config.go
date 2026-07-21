@@ -18,8 +18,6 @@ type Config struct {
 
 	JWTSecret     string
 	TokenTTL      time.Duration
-	AdminUsername string
-	AdminPassword string
 
 	APIBase string
 
@@ -45,8 +43,6 @@ func Load() Config {
 		RedisDB:             envOrInt("REDIS_DB", 0),
 		JWTSecret:           envOrDefault("JWT_SECRET", "dev-secret-change-me"),
 		TokenTTL:            envOrDuration("JWT_TTL", 24*time.Hour),
-		AdminUsername:       envOrDefault("ADMIN_USERNAME", "admin"),
-		AdminPassword:       envOrDefault("ADMIN_PASSWORD", "admin"),
 		APIBase:             envOrDefault("API_BASE", "http://localhost:8080"),
 		ResNetReplicas:      envOrList("RESNET_REPLICAS", []string{"http://resnet-1:8000", "http://resnet-2:8000", "http://resnet-3:8000"}),
 		VGGReplicas:         envOrList("VGG_REPLICAS", []string{"http://vgg-1:8000", "http://vgg-2:8000", "http://vgg-3:8000"}),

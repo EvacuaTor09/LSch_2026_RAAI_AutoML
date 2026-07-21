@@ -38,6 +38,18 @@ export async function login(username: string, password: string): Promise<LoginRe
   return (await response.json()) as LoginResponse;
 }
 
+export async function register(username: string, password: string): Promise<LoginResponse> {
+  const response = await fetch(`${API_URL}/api/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+  return (await response.json()) as LoginResponse;
+}
+
 export async function me(): Promise<AuthUser> {
   const response = await fetch(`${API_URL}/api/auth/me`, {
     headers: authHeaders(),
@@ -100,6 +112,21 @@ export async function predictTask(input: { taskId: string; model: string; file: 
   formData.append('file', input.file);
 
   const response = await fetch(`${API_URL}/api/tasks/${input.taskId}/predict?model=${encodeURIComponent(input.model)}`, {
+    method: 'POST',
+    headers: authHeaders(),
+    body: formData,
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+  return (await response.json()) as PredictionResult;
+}
+
+export async function predictPretrained(input: { model: string; file: File }): Promise<PredictionResult> {
+  const formData = new FormData();
+  formData.append('file', input.file);
+
+  const response = await fetch(`${API_URL}/api/predict/pretrained?model=${encodeURIComponent(input.model)}`, {
     method: 'POST',
     headers: authHeaders(),
     body: formData,

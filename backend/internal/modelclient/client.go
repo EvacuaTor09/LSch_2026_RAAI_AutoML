@@ -181,6 +181,14 @@ func (c *Client) Predict(ctx context.Context, endpoint string, fileName string, 
 	return payload, nil
 }
 
+func (c *Client) PredictPretrained(ctx context.Context, modelName string, fileName string, fileData []byte) (domain.PredictionResult, error) {
+	replicas := c.replicasForModel(domain.ModelName(modelName))
+	if len(replicas) == 0 {
+		return domain.PredictionResult{}, fmt.Errorf("no replicas configured for %s", modelName)
+	}
+	return c.Predict(ctx, replicas[0], fileName, fileData)
+}
+
 func (c *Client) replicasForModel(modelName domain.ModelName) []string {
 	switch modelName {
 	case domain.ModelResNet50:

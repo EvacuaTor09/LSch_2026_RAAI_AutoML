@@ -31,12 +31,14 @@ func NewRouter(deps Deps) *Router {
 
 	mux.HandleFunc("GET /healthz", h.Health)
 	mux.HandleFunc("POST /api/auth/login", h.Login)
+	mux.HandleFunc("POST /api/auth/register", h.Register)
 	mux.HandleFunc("GET /api/auth/me", h.Me)
 	mux.HandleFunc("POST /api/datasets/inspect", h.InspectDataset)
 	mux.HandleFunc("POST /api/tasks", h.CreateTask)
 	mux.HandleFunc("GET /api/tasks", h.ListTasks)
 	mux.HandleFunc("GET /api/tasks/", h.GetTask)
 	mux.HandleFunc("POST /api/tasks/{id}/predict", h.PredictTask)
+	mux.HandleFunc("POST /api/predict/pretrained", h.PredictPretrained)
 
 	return &Router{mux: mux, auth: deps.Auth}
 }
@@ -64,5 +66,6 @@ func (r *Router) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func isPublicRoute(method, path string) bool {
-	return (method == http.MethodGet && path == "/healthz") || (method == http.MethodPost && path == "/api/auth/login")
+	return (method == http.MethodGet && path == "/healthz") ||
+		(method == http.MethodPost && (path == "/api/auth/login" || path == "/api/auth/register"))
 }

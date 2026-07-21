@@ -8,7 +8,9 @@ import {
   inspectDataset,
   login,
   me,
+  predictPretrained,
   predictTask,
+  register,
   setAuthToken,
 } from './api';
 import type {
@@ -32,8 +34,9 @@ const SPLIT_KEYS = ['train', 'val', 'test'] as const;
 export function App() {
   const [authUser, setAuthUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
-  const [loginUsername, setLoginUsername] = useState('admin');
-  const [loginPassword, setLoginPassword] = useState('admin');
+  const [authMode, setAuthMode] = useState<'login' | 'register'>('register');
+  const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loginBusy, setLoginBusy] = useState(false);
   const [loginError, setLoginError] = useState('');
 
@@ -50,6 +53,11 @@ export function App() {
   const [predictFile, setPredictFile] = useState<File | null>(null);
   const [predictModel, setPredictModel] = useState('');
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [pretrainedPredictFile, setPretrainedPredictFile] = useState<File | null>(null);
+  const [pretrainedPredictModel, setPretrainedPredictModel] = useState<ModelName>('resnet50');
+  const [pretrainedPrediction, setPretrainedPrediction] = useState<PredictionResult | null>(null);
+  const [pretrainedBusy, setPretrainedBusy] = useState(false);
+  const [pretrainedError, setPretrainedError] = useState('');
   const [predictBusy, setPredictBusy] = useState(false);
   const [predictError, setPredictError] = useState('');
 
@@ -130,11 +138,13 @@ export function App() {
     setLoginBusy(true);
     setLoginError('');
     try {
-      const result = await login(loginUsername, loginPassword);
+      const result = authMode === 'login'
+        ? await login(loginUsername, loginPassword)
+        : await register(loginUsername, loginPassword);
       setAuthToken(result.token);
       setAuthUser({ username: result.username });
     } catch (loginFailure) {
-      setLoginError(loginFailure instanceof Error ? loginFailure.message : 'Не удалось войти');
+      setLoginError(loginFailure instanceof Error ? loginFailure.message : 'Не удалось продолжить');
     } finally {
       setLoginBusy(false);
     }
@@ -147,11 +157,15 @@ export function App() {
     setClasses([]);
     setTask(null);
     setPrediction(null);
+    setPretrainedPrediction(null);
     setPredictFile(null);
+    setPretrainedPredictFile(null);
     setPredictModel('');
+    setPretrainedPredictModel('resnet50');
     setStatus('');
     setError('');
     setPredictError('');
+    setPretrainedError('');
   }
 
   async function handleInspect() {
@@ -234,6 +248,27 @@ export function App() {
     }
   }
 
+  async function handlePretrainedPredict() {
+    if (!pretrainedPredictFile) {
+      setPretrainedError('Выбери файл для предсказания');
+      return;
+    }
+    if (!pretrainedPredictModel) {
+      setPretrainedError('Выбери модель');
+      return;
+    }
+    setPretrainedBusy(true);
+    setPretrainedError('');
+    try {
+      const result = await predictPretrained({ model: pretrainedPredictModel, file: pretrainedPredictFile });
+      setPretrainedPrediction(result);
+    } catch (failure) {
+      setPretrainedError(failure instanceof Error ? failure.message : 'Не удалось выполнить predict');
+    } finally {
+      setPretrainedBusy(false);
+    }
+  }
+
   function toggleModel(model: ModelName) {
     setSelectedModels((current) =>
       current.includes(model) ? current.filter((item) => item !== model) : [...current, model],
@@ -282,8 +317,8 @@ export function App() {
       <div className="shell auth-shell">
         <div className="auth-hero">
           <p className="eyebrow">AutoML access</p>
-          <h1>Вход в систему</h1>
-          <p className="lead">Авторизуйся, чтобы открыть загрузку датасета, обучение и predict.</p>
+          <h1>{authMode === 'login' ? 'Вход в систему' : 'Регистрация'}</h1>
+          <p className="lead">Создай аккаунт или войди, чтобы открыть загрузку датасета, обучение и predict.</p>
         </div>
         <form className="panel auth-panel" onSubmit={handleLogin}>
           <label>
@@ -296,7 +331,10 @@ export function App() {
           </label>
           {loginError && <p className="error">{loginError}</p>}
           <button type="submit" className="primary" disabled={loginBusy}>
-            {loginBusy ? 'Входим...' : 'Войти'}
+            {loginBusy ? 'Жди...' : authMode === 'login' ? 'Войти' : 'Создать аккаунт'}
+          </button>
+          <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
+            {authMode === 'login' ? 'Нет аккаунта? Регистрация' : 'У меня уже есть аккаунт'}
           </button>
         </form>
       </div>
@@ -592,6 +630,45 @@ export function App() {
                 <Metric label="confidence" value={formatPercent(prediction.confidence)} />
               </div>
               <pre>{JSON.stringify(prediction.probabilities, null, 2)}</pre>
+            </div>
+          ) : null}
+        </section>
+
+        <section className="panel wide">
+          <h2>6. Pretrained predict</h2>
+          <div className="predict-grid">
+            <label>
+              Модель
+              <select value={pretrainedPredictModel} onChange={(event) => setPretrainedPredictModel(event.target.value as ModelName)}>
+                {MODELS.map((model) => (
+                  <option key={model.id} value={model.id}>
+                    {model.id}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Изображение
+              <input type="file" accept="image/*" onChange={(event) => setPretrainedPredictFile(event.target.files?.[0] ?? null)} />
+            </label>
+            <button type="button" className="primary" onClick={handlePretrainedPredict} disabled={pretrainedBusy}>
+              {pretrainedBusy ? 'Считаю...' : 'Predict'}
+            </button>
+          </div>
+          {pretrainedError && <p className="error">{pretrainedError}</p>}
+          {pretrainedPrediction ? (
+            <div className="result-item">
+              <div className="result-head">
+                <strong>{pretrainedPrediction.class_name}</strong>
+                <span>{formatPercent(pretrainedPrediction.confidence)} confidence</span>
+              </div>
+              <div className="metric-grid">
+                <Metric label="model" value={pretrainedPrediction.model} />
+                <Metric label="model_type" value={pretrainedPrediction.model_type} />
+                <Metric label="class_id" value={String(pretrainedPrediction.class_id)} />
+                <Metric label="confidence" value={formatPercent(pretrainedPrediction.confidence)} />
+              </div>
+              <pre>{JSON.stringify(pretrainedPrediction.probabilities, null, 2)}</pre>
             </div>
           ) : null}
         </section>
