@@ -23,9 +23,9 @@ import type {
 } from './types';
 
 const MODELS: Array<{ id: ModelName; title: string; hint: string }> = [
-  { id: 'resnet50', title: 'ResNet-50', hint: 'Сильный CNN-бейзлайн' },
-  { id: 'vgg16', title: 'VGG-16', hint: 'Простая и стабильная сеть' },
-  { id: 'vit_base_patch16_224', title: 'ViT-B/16', hint: 'Трансформер для изображений' },
+  { id: 'resnet50', title: 'ResNet-50', hint: 'CNN-бейзлайн' },
+  { id: 'vgg16', title: 'VGG-16', hint: 'Простая сеть' },
+  { id: 'vit_base_patch16_224', title: 'ViT-B/16', hint: 'Трансформер' },
 ];
 
 const DEFAULT_SPLIT: SplitRatio = { train: 60, val: 30, test: 10 };
@@ -138,9 +138,10 @@ export function App() {
     setLoginBusy(true);
     setLoginError('');
     try {
-      const result = authMode === 'login'
-        ? await login(loginUsername, loginPassword)
-        : await register(loginUsername, loginPassword);
+      const result =
+        authMode === 'login'
+          ? await login(loginUsername, loginPassword)
+          : await register(loginUsername, loginPassword);
       setAuthToken(result.token);
       setAuthUser({ username: result.username });
     } catch (loginFailure) {
@@ -304,9 +305,10 @@ export function App() {
 
   if (authLoading) {
     return (
-      <div className="shell auth-shell">
-        <div className="panel auth-panel">
-          <p className="muted">Проверяю авторизацию...</p>
+      <div className="auth-shell">
+        <div className="auth-brand">
+          <h1>AutoML</h1>
+          <p className="muted">Проверяю сессию…</p>
         </div>
       </div>
     );
@@ -314,28 +316,34 @@ export function App() {
 
   if (!authUser) {
     return (
-      <div className="shell auth-shell">
-        <div className="auth-hero">
-          <p className="eyebrow">AutoML access</p>
-          <h1>{authMode === 'login' ? 'Вход в систему' : 'Регистрация'}</h1>
-          <p className="lead">Создай аккаунт или войди, чтобы открыть загрузку датасета, обучение и predict.</p>
+      <div className="auth-shell">
+        <div className="auth-brand">
+          <h1>AutoML</h1>
+          <p>Сравни модели на своём датасете и сразу проверь predict.</p>
         </div>
-        <form className="panel auth-panel" onSubmit={handleLogin}>
+        <form className="auth-form" onSubmit={handleLogin}>
           <label>
             Username
-            <input value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} />
+            <input value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} autoComplete="username" />
           </label>
           <label>
             Password
-            <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} />
+            <input
+              type="password"
+              value={loginPassword}
+              onChange={(event) => setLoginPassword(event.target.value)}
+              autoComplete={authMode === 'login' ? 'current-password' : 'new-password'}
+            />
           </label>
-          {loginError && <p className="error">{loginError}</p>}
-          <button type="submit" className="primary" disabled={loginBusy}>
-            {loginBusy ? 'Жди...' : authMode === 'login' ? 'Войти' : 'Создать аккаунт'}
-          </button>
-          <button type="button" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
-            {authMode === 'login' ? 'Нет аккаунта? Регистрация' : 'У меня уже есть аккаунт'}
-          </button>
+          {loginError ? <p className="error">{loginError}</p> : null}
+          <div className="actions">
+            <button type="submit" className="primary" disabled={loginBusy}>
+              {loginBusy ? 'Жди…' : authMode === 'login' ? 'Войти' : 'Создать аккаунт'}
+            </button>
+            <button type="button" className="ghost" onClick={() => setAuthMode(authMode === 'login' ? 'register' : 'login')}>
+              {authMode === 'login' ? 'Регистрация' : 'Уже есть аккаунт'}
+            </button>
+          </div>
         </form>
       </div>
     );
@@ -343,38 +351,28 @@ export function App() {
 
   return (
     <div className="shell">
-      <header className="hero">
-        <div>
-          <p className="eyebrow">AutoML orchestration</p>
-          <h1>Панель задач для обучения нескольких моделей</h1>
-          <p className="lead">
-            Загрузи архив, настрой разбиение по классам, выбери модели и отправь задачу в backend.
-          </p>
+      <header className="topbar">
+        <div className="brand">
+          Auto<span>ML</span>
         </div>
-        <div className="hero-card">
-          <div className="stat">
-            <span>User</span>
-            <strong>{authUser.username}</strong>
-          </div>
-          <div className="stat">
-            <span>Split default</span>
-            <strong>
-              {defaultSplit.train}/{defaultSplit.val}/{defaultSplit.test}
-            </strong>
-          </div>
-          <div className="stat">
-            <span>Selected models</span>
-            <strong>{selectedModels.length}</strong>
-          </div>
-          <button type="button" onClick={handleLogout}>
+        <div className="topbar-meta">
+          <span>{authUser.username}</span>
+          <span>
+            split {defaultSplit.train}/{defaultSplit.val}/{defaultSplit.test}
+          </span>
+          <span>{selectedModels.length} models</span>
+          <button type="button" className="ghost" onClick={handleLogout}>
             Выйти
           </button>
         </div>
       </header>
 
-      <main className="grid">
-        <section className="panel">
-          <h2>1. Архив датасета</h2>
+      <main className="flow">
+        <section className="section">
+          <div className="section-head">
+            <h2>Датасет</h2>
+            <p>Загрузи архив с классами в корне, разбери структуру и запусти обучение.</p>
+          </div>
           <input
             type="file"
             accept=".zip,.jar,.tar,.tgz,.tar.gz,.rar,.7z"
@@ -390,23 +388,26 @@ export function App() {
             <button type="button" onClick={handleInspect} disabled={loading || !archive}>
               Найти классы
             </button>
-            <button type="button" onClick={handleCreateTask} disabled={loading || !archive} className="primary">
+            <button type="button" className="primary" onClick={handleCreateTask} disabled={loading || !archive}>
               Создать задачу
             </button>
           </div>
-          <p className="muted">Поддержка: zip, jar, tar, tgz, tar.gz, rar, 7z. Каждый верхний каталог — отдельный класс.</p>
+          <p className="muted">zip, jar, tar, tgz, rar, 7z — каждый верхний каталог это класс.</p>
         </section>
 
-        <section className="panel">
-          <h2>2. Модели</h2>
-          <div className="model-grid">
+        <section className="section">
+          <div className="section-head">
+            <h2>Модели</h2>
+            <p>Выбери, какие сети дообучить на датасете.</p>
+          </div>
+          <div className="model-row">
             {MODELS.map((model) => {
               const active = selectedModels.includes(model.id);
               return (
                 <button
                   key={model.id}
                   type="button"
-                  className={`model-card ${active ? 'active' : ''}`}
+                  className={`model-chip ${active ? 'active' : ''}`}
                   onClick={() => toggleModel(model.id)}
                 >
                   <strong>{model.title}</strong>
@@ -417,8 +418,11 @@ export function App() {
           </div>
         </section>
 
-        <section className="panel">
-          <h2>3. Split settings</h2>
+        <section className="section">
+          <div className="section-head">
+            <h2>Разбиение</h2>
+            <p>Задай train / val / test и перетащи классы по корзинам.</p>
+          </div>
           <div className="split-row">
             {SPLIT_KEYS.map((field) => (
               <label key={field}>
@@ -447,12 +451,12 @@ export function App() {
                 onDrop={(event) => handleDrop(event, bucket)}
               >
                 <div className="bucket-head">
-                  <strong>{bucket.toUpperCase()}</strong>
-                  <span>{classBuckets[bucket].length} classes</span>
+                  <strong>{bucket}</strong>
+                  <span>{classBuckets[bucket].length}</span>
                 </div>
                 <div className="chip-row">
                   {classBuckets[bucket].length === 0 ? (
-                    <p className="muted">Перетащи класс сюда</p>
+                    <p className="muted">Перетащи класс</p>
                   ) : (
                     classBuckets[bucket].map((className) => (
                       <div
@@ -472,16 +476,16 @@ export function App() {
           </div>
           <div className="class-list">
             {classes.length === 0 ? (
-              <p className="muted">Сначала загрузи архив и нажми «Найти классы».</p>
+              <p className="muted">Сначала найди классы в архиве.</p>
             ) : (
               classes.map((className) => {
                 const split = classSplits[className] ?? DEFAULT_SPLIT;
                 return (
-                  <div className="class-card" key={className}>
+                  <div className="class-item" key={className}>
                     <strong draggable onDragStart={(event) => handleDragStart(event, className)}>
                       {className}
                     </strong>
-                    <div className="split-row compact">
+                    <div className="split-row">
                       {SPLIT_KEYS.map((field) => (
                         <label key={field}>
                           {field}
@@ -510,39 +514,42 @@ export function App() {
           </div>
         </section>
 
-        <section className="panel wide">
-          <h2>4. Task status</h2>
-          {status && <p className="muted">{status}</p>}
-          {error && <p className="error">{error}</p>}
+        <section className="section">
+          <div className="section-head">
+            <h2>Результаты</h2>
+            <p>Статус задачи и сравнение метрик по моделям.</p>
+          </div>
+          {status ? <p className="muted">{status}</p> : null}
+          {error ? <p className="error">{error}</p> : null}
           {task ? (
-            <div className="result-card">
-              <div className="result-top">
+            <>
+              <div className="status-line">
                 <div>
-                  <p className="muted">Task ID</p>
+                  <span>task</span>
                   <strong>{task.id}</strong>
                 </div>
                 <div>
-                  <p className="muted">Status</p>
+                  <span>status</span>
                   <strong>{task.status}</strong>
                 </div>
                 <div>
-                  <p className="muted">Best</p>
+                  <span>best</span>
                   <strong>
-                    {task.best_model ?? 'pending'}{' '}
-                    {task.best_accuracy ? `(${Math.round(task.best_accuracy * 10000) / 100}%)` : ''}
+                    {task.best_model ?? 'pending'}
+                    {task.best_accuracy ? ` · ${formatPercent(task.best_accuracy)}` : ''}
                   </strong>
                 </div>
               </div>
               {task.best_params && Object.keys(task.best_params).length > 0 ? (
                 <div className="metric-block">
-                  <p className="muted">Best params</p>
+                  <p>best_params</p>
                   <pre>{JSON.stringify(task.best_params, null, 2)}</pre>
                 </div>
               ) : null}
               {task.results?.length ? (
                 <div className="result-list">
                   {task.results.map((result) => (
-                    <article className="result-item" key={result.model_name}>
+                    <article className="result-block" key={result.model_name}>
                       <div className="result-head">
                         <strong>{result.model_name}</strong>
                         {result.error ? (
@@ -570,13 +577,13 @@ export function App() {
                       ) : null}
                       {!result.error && result.params ? (
                         <div className="metric-block">
-                          <p className="muted">Params</p>
+                          <p>params</p>
                           <pre>{JSON.stringify(result.params, null, 2)}</pre>
                         </div>
                       ) : null}
                       {!result.error && result.history ? (
                         <div className="metric-block">
-                          <p className="muted">History</p>
+                          <p>history</p>
                           <pre>{JSON.stringify(result.history, null, 2)}</pre>
                         </div>
                       ) : null}
@@ -584,16 +591,19 @@ export function App() {
                   ))}
                 </div>
               ) : null}
-            </div>
+            </>
           ) : (
-            <p className="muted">Здесь появится статус очереди и результат лучшей модели.</p>
+            <p className="muted">После создания задачи здесь появятся статус и метрики.</p>
           )}
         </section>
 
-        <section className="panel wide">
-          <h2>5. Predict</h2>
+        <section className="section">
+          <div className="section-head">
+            <h2>Predict</h2>
+            <p>Предсказание обученной моделью на своём изображении.</p>
+          </div>
           {task ? (
-            <div className="predict-grid">
+            <div className="row predict">
               <label>
                 Модель
                 <select value={predictModel} onChange={(event) => setPredictModel(event.target.value)}>
@@ -610,22 +620,28 @@ export function App() {
                 <input type="file" accept="image/*" onChange={(event) => setPredictFile(event.target.files?.[0] ?? null)} />
               </label>
               <button type="button" className="primary" onClick={handlePredict} disabled={predictBusy}>
-                {predictBusy ? 'Считаю...' : 'Predict'}
+                {predictBusy ? 'Считаю…' : 'Predict'}
               </button>
             </div>
           ) : (
-            <p className="muted">Сначала создай и дождись завершения задачи, чтобы открыть predict.</p>
+            <p className="muted">Сначала дождись завершения задачи.</p>
           )}
-          {predictError && <p className="error">{predictError}</p>}
+          {predictError ? <p className="error">{predictError}</p> : null}
           {prediction ? <PredictionCard prediction={prediction} /> : null}
         </section>
 
-        <section className="panel wide">
-          <h2>6. Pretrained predict</h2>
-          <div className="predict-grid">
+        <section className="section">
+          <div className="section-head">
+            <h2>Pretrained</h2>
+            <p>Быстрый ImageNet-predict без дообучения.</p>
+          </div>
+          <div className="row predict">
             <label>
               Модель
-              <select value={pretrainedPredictModel} onChange={(event) => setPretrainedPredictModel(event.target.value as ModelName)}>
+              <select
+                value={pretrainedPredictModel}
+                onChange={(event) => setPretrainedPredictModel(event.target.value as ModelName)}
+              >
                 {MODELS.map((model) => (
                   <option key={model.id} value={model.id}>
                     {model.id}
@@ -635,13 +651,17 @@ export function App() {
             </label>
             <label>
               Изображение
-              <input type="file" accept="image/*" onChange={(event) => setPretrainedPredictFile(event.target.files?.[0] ?? null)} />
+              <input
+                type="file"
+                accept="image/*"
+                onChange={(event) => setPretrainedPredictFile(event.target.files?.[0] ?? null)}
+              />
             </label>
             <button type="button" className="primary" onClick={handlePretrainedPredict} disabled={pretrainedBusy}>
-              {pretrainedBusy ? 'Считаю...' : 'Predict'}
+              {pretrainedBusy ? 'Считаю…' : 'Predict'}
             </button>
           </div>
-          {pretrainedError && <p className="error">{pretrainedError}</p>}
+          {pretrainedError ? <p className="error">{pretrainedError}</p> : null}
           {pretrainedPrediction ? <PredictionCard prediction={pretrainedPrediction} /> : null}
         </section>
       </main>
@@ -653,7 +673,7 @@ function PredictionCard({ prediction }: { prediction: PredictionResult }) {
   const hasTrainMetrics = typeof prediction.accuracy === 'number';
 
   return (
-    <div className="result-item">
+    <div className="result-block">
       <div className="result-head">
         <strong>{prediction.class_name}</strong>
         <span>{formatPercent(prediction.confidence)} confidence</span>
@@ -684,7 +704,7 @@ function PredictionCard({ prediction }: { prediction: PredictionResult }) {
       </div>
       {prediction.top_predictions?.length ? (
         <div className="metric-block">
-          <p className="muted">top_predictions</p>
+          <p>top_predictions</p>
           <div className="metric-grid">
             {prediction.top_predictions.map((item) => (
               <Metric
@@ -698,7 +718,7 @@ function PredictionCard({ prediction }: { prediction: PredictionResult }) {
       ) : null}
       {prediction.history ? (
         <div className="metric-block">
-          <p className="muted">history</p>
+          <p>history</p>
           <pre>{JSON.stringify(prediction.history, null, 2)}</pre>
         </div>
       ) : null}
