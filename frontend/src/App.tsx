@@ -385,13 +385,9 @@ export function App() {
             {SPLIT_KEYS.map((field) => (
               <label key={field}>
                 {field}, %
-                <input
-                  type="number"
-                  min={0}
-                  max={100}
+                <PercentInput
                   value={defaultSplit[field]}
-                  onChange={(event) => {
-                    const value = Number(event.target.value);
+                  onChange={(value) => {
                     const nextDefault = { ...defaultSplit, [field]: value };
                     setDefaultSplit(nextDefault);
                     setClassSplits((current) => {
@@ -432,17 +428,14 @@ export function App() {
                       {SPLIT_KEYS.map((field) => (
                         <label key={field}>
                           {field}, %
-                          <input
-                            type="number"
-                            min={0}
-                            max={100}
+                          <PercentInput
                             value={split[field]}
-                            onChange={(event) =>
+                            onChange={(value) =>
                               setClassSplits((current) => ({
                                 ...current,
                                 [className]: {
                                   ...split,
-                                  [field]: Number(event.target.value),
+                                  [field]: value,
                                 },
                               }))
                             }
@@ -667,6 +660,51 @@ function PredictionCard({ prediction }: { prediction: PredictionResult }) {
         </div>
       ) : null}
     </div>
+  );
+}
+
+function PercentInput({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const [text, setText] = useState(() => String(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) {
+      setText(String(value));
+    }
+  }, [value, focused]);
+
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    const raw = event.target.value;
+    if (raw === '') {
+      setText('');
+      onChange(0);
+      return;
+    }
+    if (!/^\d{1,3}$/.test(raw)) {
+      return;
+    }
+    const normalized = raw.replace(/^0+(?=\d)/, '');
+    const next = Math.min(100, Math.max(0, Number.parseInt(normalized, 10)));
+    if (Number.isNaN(next)) {
+      return;
+    }
+    setText(String(next));
+    onChange(next);
+  }
+
+  return (
+    <input
+      type="text"
+      inputMode="numeric"
+      pattern="[0-9]*"
+      value={text}
+      onChange={handleChange}
+      onFocus={() => setFocused(true)}
+      onBlur={() => {
+        setFocused(false);
+        setText(String(value));
+      }}
+    />
   );
 }
 
