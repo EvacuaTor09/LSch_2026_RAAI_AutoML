@@ -9,7 +9,7 @@ type TaskStatusPanelProps = {
 export function TaskStatusPanel({ status, error, task }: TaskStatusPanelProps) {
   return (
     <section className="panel wide">
-      <h2>4. Task status</h2>
+      <h2>4. Статус выполнения</h2>
       {status && <p className="muted">{status}</p>}
       {error && <p className="error">{error}</p>}
       {task ? (

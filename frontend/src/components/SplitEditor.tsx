@@ -13,11 +13,6 @@ type SplitEditorProps = {
   onClassBucketChange: (className: string, bucket: Bucket) => void;
 };
 
-// NB: per-class override (drag-n-drop по бакетам) — фича, которой не было в
-// требованиях команды к пункту 4 (там только глобальный train/val/test).
-// Уточните у бэкенда, действительно ли split_config.classes где-то
-// используется на сервере — если нет, этот блок можно смело выкинуть и
-// оставить только три числовых поля выше.
 export function SplitEditor({
   defaultSplit,
   onDefaultSplitChange,
@@ -47,7 +42,7 @@ export function SplitEditor({
 
   return (
     <section className="panel">
-      <h2>3. Split settings</h2>
+      <h2>3. Настройки сплита обучающей, валидационной и тестовой выборки</h2>
       <div className="split-row">
         {SPLIT_KEYS.map((field) => (
           <label key={field}>
@@ -77,7 +72,7 @@ export function SplitEditor({
             </div>
             <div className="chip-row">
               {buckets[bucket].length === 0 ? (
-                <p className="muted">Перетащи класс сюда</p>
+                <p className="muted">Перетащите класс сюда</p>
               ) : (
                 buckets[bucket].map((className) => (
                   <div
@@ -98,7 +93,7 @@ export function SplitEditor({
 
       <div className="class-list">
         {classes.length === 0 ? (
-          <p className="muted">Сначала загрузи архив и нажми «Найти классы».</p>
+          <p className="muted">Сначала загрузите архив и нажмите «Найти классы».</p>
         ) : (
           classes.map((className) => {
             const split = classSplits[className] ?? defaultSplit;

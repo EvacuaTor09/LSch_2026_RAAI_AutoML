@@ -29,7 +29,7 @@ export function ModelPicker({ selected, onToggle }: ModelPickerProps) {
       </div>
       {selected.length === 3 && (
         <p className="muted">
-          Все 3 модели обучаются на CPU-only машине — это займёт заметно больше времени, чем одна-две.
+          Все 3 модели обучаются на CPU-only машине, что займёт заметно больше времени.
         </p>
       )}
     </section>
