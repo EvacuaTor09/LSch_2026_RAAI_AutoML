@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import type { DragEvent, FormEvent } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
+import type { ChangeEvent, DragEvent, FormEvent } from 'react';
 import {
   clearAuthToken,
   createTask,
@@ -353,11 +353,12 @@ export function App() {
             <h2>Датасет</h2>
             <p>Загрузи архив с классами в корне, разбери структуру и запусти обучение.</p>
           </div>
-          <input
-            type="file"
+          <FilePicker
             accept=".zip,.jar,.tar,.tgz,.tar.gz,.rar,.7z"
-            onChange={(event) => {
-              setArchive(event.target.files?.[0] ?? null);
+            file={archive}
+            buttonLabel="Выбрать архив"
+            onChange={(file) => {
+              setArchive(file);
               setStatus('');
               setError('');
               setTask(null);
@@ -597,10 +598,13 @@ export function App() {
                 ))}
               </select>
             </label>
-            <label>
-              Изображение
-              <input type="file" accept="image/*" onChange={(event) => setPredictFile(event.target.files?.[0] ?? null)} />
-            </label>
+            <FilePicker
+              label="Изображение"
+              accept="image/*"
+              file={predictFile}
+              buttonLabel="Выбрать фото"
+              onChange={setPredictFile}
+            />
             <button type="button" className="primary" onClick={handlePredict} disabled={predictBusy}>
               {predictBusy ? 'Считаю…' : 'Predict'}
             </button>
@@ -610,6 +614,39 @@ export function App() {
           {prediction ? <PredictionCard prediction={prediction} /> : null}
         </section>
       </main>
+    </div>
+  );
+}
+
+function FilePicker({
+  accept,
+  file,
+  label,
+  buttonLabel = 'Выбрать файл',
+  onChange,
+}: {
+  accept: string;
+  file: File | null;
+  label?: string;
+  buttonLabel?: string;
+  onChange: (file: File | null) => void;
+}) {
+  const inputId = useId();
+
+  function handleChange(event: ChangeEvent<HTMLInputElement>) {
+    onChange(event.target.files?.[0] ?? null);
+  }
+
+  return (
+    <div className="file-picker">
+      {label ? <span className="file-picker-label">{label}</span> : null}
+      <div className="file-picker-row">
+        <input id={inputId} className="file-picker-input" type="file" accept={accept} onChange={handleChange} />
+        <label htmlFor={inputId} className="file-picker-btn">
+          {buttonLabel}
+        </label>
+        <span className="file-picker-name">{file?.name ?? 'Файл не выбран'}</span>
+      </div>
     </div>
   );
 }
