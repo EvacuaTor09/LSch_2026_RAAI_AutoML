@@ -51,13 +51,8 @@ export function App() {
   const [error, setError] = useState('');
 
   const [predictFile, setPredictFile] = useState<File | null>(null);
-  const [predictModel, setPredictModel] = useState('');
+  const [predictModel, setPredictModel] = useState<string>('resnet50');
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
-  const [pretrainedPredictFile, setPretrainedPredictFile] = useState<File | null>(null);
-  const [pretrainedPredictModel, setPretrainedPredictModel] = useState<ModelName>('resnet50');
-  const [pretrainedPrediction, setPretrainedPrediction] = useState<PredictionResult | null>(null);
-  const [pretrainedBusy, setPretrainedBusy] = useState(false);
-  const [pretrainedError, setPretrainedError] = useState('');
   const [predictBusy, setPredictBusy] = useState(false);
   const [predictError, setPredictError] = useState('');
 
@@ -74,6 +69,12 @@ export function App() {
     }
     return buckets;
   }, [classes, classSplits]);
+
+  const useTrainedPredict = Boolean(task && task.status === 'completed');
+  const predictModels = useMemo(
+    () => (useTrainedPredict && task ? task.models : MODELS.map((model) => model.id)),
+    [useTrainedPredict, task],
+  );
 
   useEffect(() => {
     let active = true;
@@ -127,11 +128,16 @@ export function App() {
   }, [task]);
 
   useEffect(() => {
-    if (!task || predictModel) {
+    if (useTrainedPredict && task) {
+      if (!task.models.includes(predictModel as ModelName)) {
+        setPredictModel(task.best_model ?? task.models[0] ?? 'resnet50');
+      }
       return;
     }
-    setPredictModel(task.best_model ?? task.models[0] ?? '');
-  }, [task, predictModel]);
+    if (!MODELS.some((model) => model.id === predictModel)) {
+      setPredictModel('resnet50');
+    }
+  }, [task, useTrainedPredict, predictModel]);
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -158,15 +164,11 @@ export function App() {
     setClasses([]);
     setTask(null);
     setPrediction(null);
-    setPretrainedPrediction(null);
     setPredictFile(null);
-    setPretrainedPredictFile(null);
-    setPredictModel('');
-    setPretrainedPredictModel('resnet50');
+    setPredictModel('resnet50');
     setStatus('');
     setError('');
     setPredictError('');
-    setPretrainedError('');
   }
 
   async function handleInspect() {
@@ -225,10 +227,6 @@ export function App() {
   }
 
   async function handlePredict() {
-    if (!task) {
-      setPredictError('Сначала создай и дождись завершения задачи');
-      return;
-    }
     if (!predictFile) {
       setPredictError('Выбери файл для предсказания');
       return;
@@ -240,33 +238,15 @@ export function App() {
     setPredictBusy(true);
     setPredictError('');
     try {
-      const result = await predictTask({ taskId: task.id, model: predictModel, file: predictFile });
+      const result =
+        useTrainedPredict && task
+          ? await predictTask({ taskId: task.id, model: predictModel, file: predictFile })
+          : await predictPretrained({ model: predictModel as ModelName, file: predictFile });
       setPrediction(result);
     } catch (predictFailure) {
       setPredictError(predictFailure instanceof Error ? predictFailure.message : 'Не удалось выполнить predict');
     } finally {
       setPredictBusy(false);
-    }
-  }
-
-  async function handlePretrainedPredict() {
-    if (!pretrainedPredictFile) {
-      setPretrainedError('Выбери файл для предсказания');
-      return;
-    }
-    if (!pretrainedPredictModel) {
-      setPretrainedError('Выбери модель');
-      return;
-    }
-    setPretrainedBusy(true);
-    setPretrainedError('');
-    try {
-      const result = await predictPretrained({ model: pretrainedPredictModel, file: pretrainedPredictFile });
-      setPretrainedPrediction(result);
-    } catch (failure) {
-      setPretrainedError(failure instanceof Error ? failure.message : 'Не удалось выполнить predict');
-    } finally {
-      setPretrainedBusy(false);
     }
   }
 
@@ -600,69 +580,34 @@ export function App() {
         <section className="section">
           <div className="section-head">
             <h2>Predict</h2>
-            <p>Предсказание обученной моделью на своём изображении.</p>
-          </div>
-          {task ? (
-            <div className="row predict">
-              <label>
-                Модель
-                <select value={predictModel} onChange={(event) => setPredictModel(event.target.value)}>
-                  <option value="">Выбери модель</option>
-                  {task.models.map((model) => (
-                    <option key={model} value={model}>
-                      {model}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                Изображение
-                <input type="file" accept="image/*" onChange={(event) => setPredictFile(event.target.files?.[0] ?? null)} />
-              </label>
-              <button type="button" className="primary" onClick={handlePredict} disabled={predictBusy}>
-                {predictBusy ? 'Считаю…' : 'Predict'}
-              </button>
-            </div>
-          ) : (
-            <p className="muted">Сначала дождись завершения задачи.</p>
-          )}
-          {predictError ? <p className="error">{predictError}</p> : null}
-          {prediction ? <PredictionCard prediction={prediction} /> : null}
-        </section>
-
-        <section className="section">
-          <div className="section-head">
-            <h2>Pretrained</h2>
-            <p>Быстрый ImageNet-predict без дообучения.</p>
+            <p>
+              {useTrainedPredict
+                ? 'Предсказание дообученной моделью из завершённой задачи.'
+                : 'Пока нет задачи — ImageNet pretrained. После обучения автоматически переключится на trained.'}
+            </p>
           </div>
           <div className="row predict">
             <label>
               Модель
-              <select
-                value={pretrainedPredictModel}
-                onChange={(event) => setPretrainedPredictModel(event.target.value as ModelName)}
-              >
-                {MODELS.map((model) => (
-                  <option key={model.id} value={model.id}>
-                    {model.id}
+              <select value={predictModel} onChange={(event) => setPredictModel(event.target.value)}>
+                {predictModels.map((model) => (
+                  <option key={model} value={model}>
+                    {model}
                   </option>
                 ))}
               </select>
             </label>
             <label>
               Изображение
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setPretrainedPredictFile(event.target.files?.[0] ?? null)}
-              />
+              <input type="file" accept="image/*" onChange={(event) => setPredictFile(event.target.files?.[0] ?? null)} />
             </label>
-            <button type="button" className="primary" onClick={handlePretrainedPredict} disabled={pretrainedBusy}>
-              {pretrainedBusy ? 'Считаю…' : 'Predict'}
+            <button type="button" className="primary" onClick={handlePredict} disabled={predictBusy}>
+              {predictBusy ? 'Считаю…' : 'Predict'}
             </button>
           </div>
-          {pretrainedError ? <p className="error">{pretrainedError}</p> : null}
-          {pretrainedPrediction ? <PredictionCard prediction={pretrainedPrediction} /> : null}
+          <p className="muted">{useTrainedPredict ? 'режим: trained' : 'режим: pretrained'}</p>
+          {predictError ? <p className="error">{predictError}</p> : null}
+          {prediction ? <PredictionCard prediction={prediction} /> : null}
         </section>
       </main>
     </div>
