@@ -50,13 +50,20 @@ export type TaskResult = {
   }>;
 };
 
+export type TopPrediction = {
+	class_id: number;
+	class_name: string;
+	confidence: number;
+};
+
 export type PredictionResult = {
 	model: string;
 	model_type: string;
 	class_id: number;
 	class_name: string;
 	confidence: number;
-	probabilities: number[];
+	probabilities?: number[];
+	top_predictions?: TopPrediction[];
 	status?: string;
 	task_id?: string;
 	model_name?: string;

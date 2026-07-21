@@ -28,9 +28,30 @@ DATA_DIR = Path(os.getenv("DATA_DIR", "/app/data"))
 WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 
 model_wrapper: Optional[ModelWrapper] = None
+pretrained_wrapper: Optional[ModelWrapper] = None
 num_classes = 0
 class_names: List[str] = []
 last_train_result: Optional[dict] = None
+_imagenet_names: Optional[List[str]] = None
+
+
+def imagenet_class_names() -> List[str]:
+    global _imagenet_names
+    if _imagenet_names is not None:
+        return _imagenet_names
+
+    from models import REGISTRY
+    import torchvision.models as tv_models
+
+    meta = REGISTRY.get(MODEL_NAME, {})
+    weights = meta.get("weights")
+    if weights is not None and hasattr(weights, "meta"):
+        categories = weights.meta.get("categories") or []
+        if categories:
+            _imagenet_names = list(categories)
+            return _imagenet_names
+    _imagenet_names = list(tv_models.ResNet50_Weights.IMAGENET1K_V1.meta["categories"])
+    return _imagenet_names
 
 
 def ensure_model_wrapper_for_predict() -> ModelWrapper:
@@ -38,8 +59,15 @@ def ensure_model_wrapper_for_predict() -> ModelWrapper:
     if model_wrapper is None:
         model_wrapper = ModelWrapper(model_name=MODEL_NAME, model_type=MODEL_TYPE, num_classes=1000)
         num_classes = 1000
-        class_names = []
+        class_names = imagenet_class_names()
     return model_wrapper
+
+
+def ensure_pretrained_wrapper() -> ModelWrapper:
+    global pretrained_wrapper
+    if pretrained_wrapper is None:
+        pretrained_wrapper = ModelWrapper(model_name=MODEL_NAME, model_type=MODEL_TYPE, num_classes=1000)
+    return pretrained_wrapper
 
 
 def train_result_for_client(result: dict) -> dict:
@@ -64,6 +92,53 @@ def train_result_for_client(result: dict) -> dict:
         "model_size_mb": result.get("model_size_mb"),
         "history": result.get("history"),
     }
+
+
+def build_top_predictions(probs: torch.Tensor, names: List[str], k: int = 5) -> List[dict]:
+    top_k = min(k, int(probs.numel()))
+    values, indices = torch.topk(probs, k=top_k)
+    predictions = []
+    for score, idx in zip(values.tolist(), indices.tolist()):
+        class_id = int(idx)
+        class_name = names[class_id] if names and class_id < len(names) else str(class_id)
+        predictions.append(
+            {
+                "class_id": class_id,
+                "class_name": class_name,
+                "confidence": float(score),
+            }
+        )
+    return predictions
+
+
+def build_predict_response(
+    *,
+    wrapper: ModelWrapper,
+    pred: int,
+    confidence: float,
+    probs: torch.Tensor,
+    names: List[str],
+    include_train_metrics: bool,
+) -> dict:
+    name = names[pred] if names and pred < len(names) else str(pred)
+    param_info = wrapper.count_parameters()
+    response = {
+        "status": "success",
+        "model": MODEL_NAME,
+        "model_name": MODEL_NAME,
+        "model_type": MODEL_TYPE,
+        "class_id": pred,
+        "class_name": name,
+        "confidence": confidence,
+        "num_classes": len(names) if names else int(probs.numel()),
+        "num_params": param_info["total"],
+        "trainable_params": param_info["trainable"],
+        "model_size_mb": round(wrapper.loader.model_size_mb(MODEL_NAME), 2),
+        "top_predictions": build_top_predictions(probs, names),
+    }
+    if include_train_metrics and last_train_result is not None:
+        response = {**train_result_for_client(last_train_result), **response}
+    return response
 
 inference_transform = transforms.Compose(
     [
@@ -184,9 +259,16 @@ async def train_model(request_data: dict):
 
 
 @app.post("/predict")
-async def predict(file: UploadFile = File(...)):
-    """Single-image inference; after /train returns metrics/params (not weights) plus class prediction."""
-    wrapper = ensure_model_wrapper_for_predict()
+async def predict(file: UploadFile = File(...), pretrained: bool = False):
+    """Single-image inference with labeled params and top-5 classes (not raw probability vector)."""
+    if pretrained:
+        wrapper = ensure_pretrained_wrapper()
+        names = imagenet_class_names()
+        include_train_metrics = False
+    else:
+        wrapper = ensure_model_wrapper_for_predict()
+        names = class_names if class_names else imagenet_class_names()
+        include_train_metrics = True
 
     try:
         model = wrapper.get_model()
@@ -201,18 +283,14 @@ async def predict(file: UploadFile = File(...)):
             pred = int(output.argmax(dim=1).item())
             confidence = float(probs[pred].item())
 
-        name = class_names[pred] if class_names and pred < len(class_names) else str(pred)
-        response = {
-            "model": MODEL_NAME,
-            "model_type": MODEL_TYPE,
-            "class_id": pred,
-            "class_name": name,
-            "confidence": confidence,
-            "probabilities": probs.tolist(),
-        }
-        if last_train_result is not None:
-            response = {**train_result_for_client(last_train_result), **response}
-        return response
+        return build_predict_response(
+            wrapper=wrapper,
+            pred=pred,
+            confidence=confidence,
+            probs=probs,
+            names=names,
+            include_train_metrics=include_train_metrics,
+        )
 
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error

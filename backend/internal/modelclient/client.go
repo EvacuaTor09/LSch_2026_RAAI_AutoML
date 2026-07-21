@@ -139,6 +139,18 @@ func (c *Client) Train(ctx context.Context, task domain.Task, modelName domain.M
 }
 
 func (c *Client) Predict(ctx context.Context, endpoint string, fileName string, fileData []byte) (domain.PredictionResult, error) {
+	return c.predict(ctx, endpoint, fileName, fileData, false)
+}
+
+func (c *Client) PredictPretrained(ctx context.Context, modelName string, fileName string, fileData []byte) (domain.PredictionResult, error) {
+	replicas := c.replicasForModel(domain.ModelName(modelName))
+	if len(replicas) == 0 {
+		return domain.PredictionResult{}, fmt.Errorf("no replicas configured for %s", modelName)
+	}
+	return c.predict(ctx, replicas[0], fileName, fileData, true)
+}
+
+func (c *Client) predict(ctx context.Context, endpoint string, fileName string, fileData []byte, pretrained bool) (domain.PredictionResult, error) {
 	var body bytes.Buffer
 	writer := multipart.NewWriter(&body)
 	part, err := writer.CreateFormFile("file", fileName)
@@ -153,7 +165,11 @@ func (c *Client) Predict(ctx context.Context, endpoint string, fileName string, 
 		return domain.PredictionResult{}, err
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(endpoint, "/")+"/predict", &body)
+	url := strings.TrimRight(endpoint, "/") + "/predict"
+	if pretrained {
+		url += "?pretrained=true"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, &body)
 	if err != nil {
 		return domain.PredictionResult{}, err
 	}
@@ -179,14 +195,6 @@ func (c *Client) Predict(ctx context.Context, endpoint string, fileName string, 
 		return domain.PredictionResult{}, err
 	}
 	return payload, nil
-}
-
-func (c *Client) PredictPretrained(ctx context.Context, modelName string, fileName string, fileData []byte) (domain.PredictionResult, error) {
-	replicas := c.replicasForModel(domain.ModelName(modelName))
-	if len(replicas) == 0 {
-		return domain.PredictionResult{}, fmt.Errorf("no replicas configured for %s", modelName)
-	}
-	return c.Predict(ctx, replicas[0], fileName, fileData)
 }
 
 func (c *Client) replicasForModel(modelName domain.ModelName) []string {
