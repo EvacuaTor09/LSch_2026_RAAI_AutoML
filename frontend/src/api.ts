@@ -1,14 +1,12 @@
 import type { AuthUser, LoginResponse, ModelName, PredictionResult, SplitConfig, TaskResult } from './types';
 
 function resolveApiURL(): string {
-  const fromEnv = import.meta.env.VITE_API_URL?.trim();
-  if (fromEnv) {
-    return fromEnv;
+  const fromEnv = import.meta.env.VITE_API_URL;
+  if (fromEnv !== undefined && fromEnv.trim() !== '') {
+    return fromEnv.trim().replace(/\/$/, '');
   }
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:8080`;
-  }
-  return 'http://localhost:8080';
+  // Same-origin: Vite proxy in dev, nginx /api in production.
+  return '';
 }
 
 const API_URL = resolveApiURL();

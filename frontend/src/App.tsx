@@ -556,7 +556,7 @@ export function App() {
                           <Metric label="accuracy" value={formatPercent(result.accuracy)} />
                           <Metric label="precision" value={formatPercent(result.precision)} />
                           <Metric label="recall" value={formatPercent(result.recall)} />
-                          <Metric label="f1" value={formatPercent(result.f1_score)} />
+                          <Metric label="f1_score" value={formatPercent(result.f1_score)} />
                           <Metric label="training_time" value={formatDuration(result.training_time)} />
                           <Metric label="num_params" value={formatNumber(result.num_params)} />
                           <Metric label="trainable_params" value={formatNumber(result.trainable_params)} />
@@ -627,8 +627,34 @@ export function App() {
                 <Metric label="model" value={prediction.model} />
                 <Metric label="model_type" value={prediction.model_type} />
                 <Metric label="class_id" value={String(prediction.class_id)} />
+                <Metric label="class_name" value={prediction.class_name} />
                 <Metric label="confidence" value={formatPercent(prediction.confidence)} />
+                <Metric label="accuracy" value={formatPercent(prediction.accuracy)} />
+                <Metric label="precision" value={formatPercent(prediction.precision)} />
+                <Metric label="recall" value={formatPercent(prediction.recall)} />
+                <Metric label="f1_score" value={formatPercent(prediction.f1_score)} />
+                <Metric label="training_time" value={formatDuration(prediction.training_time)} />
+                <Metric label="epochs_trained" value={formatNumber(prediction.epochs_trained)} />
+                <Metric label="best_epoch" value={formatNumber(prediction.best_epoch)} />
+                <Metric label="best_val_acc" value={formatPercent(prediction.best_val_acc)} />
+                <Metric label="num_params" value={formatNumber(prediction.num_params)} />
+                <Metric label="trainable_params" value={formatNumber(prediction.trainable_params)} />
+                <Metric label="model_size_mb" value={formatFloat(prediction.model_size_mb)} />
+                <Metric label="num_classes" value={formatNumber(prediction.num_classes)} />
+                <Metric label="task_id" value={prediction.task_id ?? 'n/a'} />
               </div>
+              {prediction.class_names?.length ? (
+                <div className="metric-block">
+                  <p className="muted">class_names</p>
+                  <pre>{JSON.stringify(prediction.class_names, null, 2)}</pre>
+                </div>
+              ) : null}
+              {prediction.history ? (
+                <div className="metric-block">
+                  <p className="muted">history</p>
+                  <pre>{JSON.stringify(prediction.history, null, 2)}</pre>
+                </div>
+              ) : null}
               <pre>{JSON.stringify(prediction.probabilities, null, 2)}</pre>
             </div>
           ) : null}

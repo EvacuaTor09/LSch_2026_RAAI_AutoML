@@ -61,12 +61,29 @@ type ModelResult struct {
 }
 
 type PredictionResult struct {
-	Model         string    `json:"model"`
-	ModelType     string    `json:"model_type"`
-	ClassID       int       `json:"class_id"`
-	ClassName     string    `json:"class_name"`
-	Confidence    float64   `json:"confidence"`
-	Probabilities []float64 `json:"probabilities"`
+	Model            string         `json:"model"`
+	ModelType        string         `json:"model_type"`
+	ClassID          int            `json:"class_id"`
+	ClassName        string         `json:"class_name"`
+	Confidence       float64        `json:"confidence"`
+	Probabilities    []float64      `json:"probabilities"`
+	Status           string         `json:"status,omitempty"`
+	TaskID           string         `json:"task_id,omitempty"`
+	ModelName        string         `json:"model_name,omitempty"`
+	NumClasses       int            `json:"num_classes,omitempty"`
+	ClassNames       []string       `json:"class_names,omitempty"`
+	Accuracy         float64        `json:"accuracy,omitempty"`
+	Precision        float64        `json:"precision,omitempty"`
+	Recall           float64        `json:"recall,omitempty"`
+	F1Score          float64        `json:"f1_score,omitempty"`
+	TrainingTime     float64        `json:"training_time,omitempty"`
+	EpochsTrained    int            `json:"epochs_trained,omitempty"`
+	BestEpoch        int            `json:"best_epoch,omitempty"`
+	BestValAcc       float64        `json:"best_val_acc,omitempty"`
+	NumParams        int64          `json:"num_params,omitempty"`
+	TrainableParams  int64          `json:"trainable_params,omitempty"`
+	ModelSizeMB      float64        `json:"model_size_mb,omitempty"`
+	History          map[string]any `json:"history,omitempty"`
 }
 
 const (

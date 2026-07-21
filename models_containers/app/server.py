@@ -30,6 +30,7 @@ WEIGHTS_DIR.mkdir(parents=True, exist_ok=True)
 model_wrapper: Optional[ModelWrapper] = None
 num_classes = 0
 class_names: List[str] = []
+last_train_result: Optional[dict] = None
 
 
 def ensure_model_wrapper_for_predict() -> ModelWrapper:
@@ -39,6 +40,30 @@ def ensure_model_wrapper_for_predict() -> ModelWrapper:
         num_classes = 1000
         class_names = []
     return model_wrapper
+
+
+def train_result_for_client(result: dict) -> dict:
+    """Metrics/params to return to the user (without weights file path)."""
+    return {
+        "status": result.get("status"),
+        "task_id": result.get("task_id"),
+        "model_name": result.get("model_name"),
+        "model_type": result.get("model_type"),
+        "num_classes": result.get("num_classes"),
+        "class_names": result.get("class_names"),
+        "accuracy": result.get("accuracy"),
+        "precision": result.get("precision"),
+        "recall": result.get("recall"),
+        "f1_score": result.get("f1_score"),
+        "training_time": result.get("training_time"),
+        "epochs_trained": result.get("epochs_trained"),
+        "best_epoch": result.get("best_epoch"),
+        "best_val_acc": result.get("best_val_acc"),
+        "num_params": result.get("num_params"),
+        "trainable_params": result.get("trainable_params"),
+        "model_size_mb": result.get("model_size_mb"),
+        "history": result.get("history"),
+    }
 
 inference_transform = transforms.Compose(
     [
@@ -53,7 +78,7 @@ inference_transform = transforms.Compose(
 @app.post("/train")
 async def train_model(request_data: dict):
     """Transfer learning: freeze backbone, train classifier on ImageFolder dataset."""
-    global model_wrapper, num_classes, class_names
+    global model_wrapper, num_classes, class_names, last_train_result
 
     try:
         task_id = request_data.get("task_id", str(uuid.uuid4()))
@@ -129,7 +154,7 @@ async def train_model(request_data: dict):
             flush=True,
         )
 
-        return {
+        last_train_result = {
             "status": "success",
             "task_id": task_id,
             "model_name": MODEL_NAME,
@@ -150,6 +175,7 @@ async def train_model(request_data: dict):
             "weights_file": str(weights_path),
             "history": training_result["history"],
         }
+        return last_train_result
 
     except HTTPException:
         raise
@@ -159,7 +185,7 @@ async def train_model(request_data: dict):
 
 @app.post("/predict")
 async def predict(file: UploadFile = File(...)):
-    """Single-image inference (assignment: predict with each model)."""
+    """Single-image inference; after /train returns metrics/params (not weights) plus class prediction."""
     wrapper = ensure_model_wrapper_for_predict()
 
     try:
@@ -176,7 +202,7 @@ async def predict(file: UploadFile = File(...)):
             confidence = float(probs[pred].item())
 
         name = class_names[pred] if class_names and pred < len(class_names) else str(pred)
-        return {
+        response = {
             "model": MODEL_NAME,
             "model_type": MODEL_TYPE,
             "class_id": pred,
@@ -184,6 +210,9 @@ async def predict(file: UploadFile = File(...)):
             "confidence": confidence,
             "probabilities": probs.tolist(),
         }
+        if last_train_result is not None:
+            response = {**train_result_for_client(last_train_result), **response}
+        return response
 
     except Exception as error:
         raise HTTPException(status_code=500, detail=str(error)) from error
