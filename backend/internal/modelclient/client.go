@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"strings"
 	"time"
@@ -77,20 +78,21 @@ func (c *Client) Train(ctx context.Context, task domain.Task, modelName domain.M
 	log.Printf("modelclient: task=%s model=%s response status=%d endpoint=%s", task.ID, modelName, response.StatusCode, endpoint)
 
 	var payload struct {
-		Status        string         `json:"status"`
-		Accuracy      float64        `json:"accuracy"`
-		Precision     float64        `json:"precision"`
-		Recall        float64        `json:"recall"`
-		F1Score       float64        `json:"f1_score"`
-		TrainingTime  float64        `json:"training_time"`
-		NumParams     int64          `json:"num_params"`
-		ModelSizeMB   float64        `json:"model_size_mb"`
-		WeightsFile   string         `json:"weights_file"`
-		BestValAcc    float64        `json:"best_val_acc"`
-		EpochsTrained int            `json:"epochs_trained"`
-		BestEpoch     int            `json:"best_epoch"`
-		History       map[string]any `json:"history"`
-		Error         string         `json:"error"`
+		Status          string         `json:"status"`
+		Accuracy        float64        `json:"accuracy"`
+		Precision       float64        `json:"precision"`
+		Recall          float64        `json:"recall"`
+		F1Score         float64        `json:"f1_score"`
+		TrainingTime    float64        `json:"training_time"`
+		NumParams       int64          `json:"num_params"`
+		TrainableParams int64          `json:"trainable_params"`
+		ModelSizeMB     float64        `json:"model_size_mb"`
+		WeightsFile     string         `json:"weights_file"`
+		BestValAcc      float64        `json:"best_val_acc"`
+		EpochsTrained   int            `json:"epochs_trained"`
+		BestEpoch       int            `json:"best_epoch"`
+		History         map[string]any `json:"history"`
+		Error           string         `json:"error"`
 	}
 	if response.StatusCode >= 300 {
 		var errorPayload map[string]any
@@ -105,21 +107,78 @@ func (c *Client) Train(ctx context.Context, task domain.Task, modelName domain.M
 	}
 
 	params := map[string]string{
-		"endpoint":       endpoint,
-		"weights_file":   payload.WeightsFile,
-		"best_val_acc":   fmt.Sprintf("%f", payload.BestValAcc),
-		"epochs_trained": fmt.Sprintf("%d", payload.EpochsTrained),
-		"best_epoch":     fmt.Sprintf("%d", payload.BestEpoch),
-		"num_params":     fmt.Sprintf("%d", payload.NumParams),
-		"model_size_mb":   fmt.Sprintf("%f", payload.ModelSizeMB),
+		"endpoint":         endpoint,
+		"weights_file":     payload.WeightsFile,
+		"best_val_acc":     fmt.Sprintf("%f", payload.BestValAcc),
+		"epochs_trained":   fmt.Sprintf("%d", payload.EpochsTrained),
+		"best_epoch":       fmt.Sprintf("%d", payload.BestEpoch),
+		"num_params":       fmt.Sprintf("%d", payload.NumParams),
+		"trainable_params": fmt.Sprintf("%d", payload.TrainableParams),
+		"model_size_mb":    fmt.Sprintf("%f", payload.ModelSizeMB),
 	}
 
 	return domain.ModelResult{
-		ModelName: string(modelName),
-		Accuracy:  payload.Accuracy,
-		Params:    params,
-		Duration:  time.Duration(payload.TrainingTime * float64(time.Second)),
+		ModelName:       string(modelName),
+		Accuracy:        payload.Accuracy,
+		Precision:       payload.Precision,
+		Recall:          payload.Recall,
+		F1Score:         payload.F1Score,
+		TrainingTime:    payload.TrainingTime,
+		NumParams:       payload.NumParams,
+		TrainableParams: payload.TrainableParams,
+		ModelSizeMB:     payload.ModelSizeMB,
+		WeightsFile:     payload.WeightsFile,
+		BestValAcc:      payload.BestValAcc,
+		EpochsTrained:   payload.EpochsTrained,
+		BestEpoch:       payload.BestEpoch,
+		History:         payload.History,
+		Endpoint:        endpoint,
+		Params:          params,
+		Duration:        time.Duration(payload.TrainingTime * float64(time.Second)),
 	}, nil
+}
+
+func (c *Client) Predict(ctx context.Context, endpoint string, fileName string, fileData []byte) (domain.PredictionResult, error) {
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
+	part, err := writer.CreateFormFile("file", fileName)
+	if err != nil {
+		return domain.PredictionResult{}, err
+	}
+	if _, err := part.Write(fileData); err != nil {
+		_ = writer.Close()
+		return domain.PredictionResult{}, err
+	}
+	if err := writer.Close(); err != nil {
+		return domain.PredictionResult{}, err
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, strings.TrimRight(endpoint, "/")+"/predict", &body)
+	if err != nil {
+		return domain.PredictionResult{}, err
+	}
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.PredictionResult{}, err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode >= 300 {
+		var errorPayload map[string]any
+		_ = json.NewDecoder(resp.Body).Decode(&errorPayload)
+		if detail, ok := errorPayload["detail"].(string); ok && detail != "" {
+			return domain.PredictionResult{}, fmt.Errorf(detail)
+		}
+		return domain.PredictionResult{}, fmt.Errorf("model prediction returned status %d", resp.StatusCode)
+	}
+
+	var payload domain.PredictionResult
+	if err := json.NewDecoder(resp.Body).Decode(&payload); err != nil {
+		return domain.PredictionResult{}, err
+	}
+	return payload, nil
 }
 
 func (c *Client) replicasForModel(modelName domain.ModelName) []string {

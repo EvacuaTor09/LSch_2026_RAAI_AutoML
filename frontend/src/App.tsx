@@ -1,7 +1,24 @@
 import { useEffect, useMemo, useState } from 'react';
-import type { DragEvent } from 'react';
-import { createTask, getTask, inspectDataset } from './api';
-import type { ModelName, SplitConfig, SplitRatio, TaskResult } from './types';
+import type { DragEvent, FormEvent } from 'react';
+import {
+  clearAuthToken,
+  createTask,
+  getAuthToken,
+  getTask,
+  inspectDataset,
+  login,
+  me,
+  predictTask,
+  setAuthToken,
+} from './api';
+import type {
+  AuthUser,
+  ModelName,
+  PredictionResult,
+  SplitConfig,
+  SplitRatio,
+  TaskResult,
+} from './types';
 
 const MODELS: Array<{ id: ModelName; title: string; hint: string }> = [
   { id: 'resnet50', title: 'ResNet-50', hint: 'Сильный CNN-бейзлайн' },
@@ -13,6 +30,13 @@ const DEFAULT_SPLIT: SplitRatio = { train: 60, val: 30, test: 10 };
 const SPLIT_KEYS = ['train', 'val', 'test'] as const;
 
 export function App() {
+  const [authUser, setAuthUser] = useState<AuthUser | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [loginUsername, setLoginUsername] = useState('admin');
+  const [loginPassword, setLoginPassword] = useState('admin');
+  const [loginBusy, setLoginBusy] = useState(false);
+  const [loginError, setLoginError] = useState('');
+
   const [archive, setArchive] = useState<File | null>(null);
   const [classes, setClasses] = useState<string[]>([]);
   const [selectedModels, setSelectedModels] = useState<ModelName[]>(['resnet50', 'vgg16', 'vit_base_patch16_224']);
@@ -23,26 +47,59 @@ export function App() {
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
+  const [predictFile, setPredictFile] = useState<File | null>(null);
+  const [predictModel, setPredictModel] = useState('');
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null);
+  const [predictBusy, setPredictBusy] = useState(false);
+  const [predictError, setPredictError] = useState('');
+
   const splitConfig: SplitConfig = useMemo(
     () => ({ default: defaultSplit, classes: classSplits }),
     [defaultSplit, classSplits],
   );
 
   const classBuckets = useMemo(() => {
-    const buckets: Record<'train' | 'val' | 'test', string[]> = {
-      train: [],
-      val: [],
-      test: [],
-    };
-
+    const buckets: Record<'train' | 'val' | 'test', string[]> = { train: [], val: [], test: [] };
     for (const className of classes) {
       const split = classSplits[className] ?? DEFAULT_SPLIT;
-      const bucket = dominantSplit(split);
-      buckets[bucket].push(className);
+      buckets[dominantSplit(split)].push(className);
     }
-
     return buckets;
   }, [classes, classSplits]);
+
+  useEffect(() => {
+    let active = true;
+
+    async function bootstrap() {
+      const token = getAuthToken();
+      if (!token) {
+        if (active) {
+          setAuthLoading(false);
+        }
+        return;
+      }
+      try {
+        const user = await me();
+        if (active) {
+          setAuthUser(user);
+        }
+      } catch {
+        clearAuthToken();
+        if (active) {
+          setAuthUser(null);
+        }
+      } finally {
+        if (active) {
+          setAuthLoading(false);
+        }
+      }
+    }
+
+    void bootstrap();
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (!task?.id || task.status === 'completed' || task.status === 'failed') {
@@ -60,6 +117,42 @@ export function App() {
 
     return () => window.clearInterval(timer);
   }, [task]);
+
+  useEffect(() => {
+    if (!task || predictModel) {
+      return;
+    }
+    setPredictModel(task.best_model ?? task.models[0] ?? '');
+  }, [task, predictModel]);
+
+  async function handleLogin(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setLoginBusy(true);
+    setLoginError('');
+    try {
+      const result = await login(loginUsername, loginPassword);
+      setAuthToken(result.token);
+      setAuthUser({ username: result.username });
+    } catch (loginFailure) {
+      setLoginError(loginFailure instanceof Error ? loginFailure.message : 'Не удалось войти');
+    } finally {
+      setLoginBusy(false);
+    }
+  }
+
+  function handleLogout() {
+    clearAuthToken();
+    setAuthUser(null);
+    setArchive(null);
+    setClasses([]);
+    setTask(null);
+    setPrediction(null);
+    setPredictFile(null);
+    setPredictModel('');
+    setStatus('');
+    setError('');
+    setPredictError('');
+  }
 
   async function handleInspect() {
     if (!archive) {
@@ -104,11 +197,40 @@ export function App() {
     try {
       const created = await createTask({ archive, models: selectedModels, splitConfig });
       setTask(created);
+      setPrediction(null);
+      setPredictError('');
+      setPredictFile(null);
+      setPredictModel(created.best_model ?? created.models[0] ?? '');
       setStatus(`Задача ${created.id} поставлена в очередь`);
     } catch (createError) {
       setError(createError instanceof Error ? createError.message : 'Не удалось создать задачу');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handlePredict() {
+    if (!task) {
+      setPredictError('Сначала создай и дождись завершения задачи');
+      return;
+    }
+    if (!predictFile) {
+      setPredictError('Выбери файл для предсказания');
+      return;
+    }
+    if (!predictModel) {
+      setPredictError('Выбери модель');
+      return;
+    }
+    setPredictBusy(true);
+    setPredictError('');
+    try {
+      const result = await predictTask({ taskId: task.id, model: predictModel, file: predictFile });
+      setPrediction(result);
+    } catch (predictFailure) {
+      setPredictError(predictFailure instanceof Error ? predictFailure.message : 'Не удалось выполнить predict');
+    } finally {
+      setPredictBusy(false);
     }
   }
 
@@ -140,10 +262,45 @@ export function App() {
   function handleDrop(event: DragEvent<HTMLDivElement>, bucket: 'train' | 'val' | 'test') {
     event.preventDefault();
     const className = event.dataTransfer.getData('text/plain');
-    if (!className) {
-      return;
+    if (className) {
+      setClassBucket(className, bucket);
     }
-    setClassBucket(className, bucket);
+  }
+
+  if (authLoading) {
+    return (
+      <div className="shell auth-shell">
+        <div className="panel auth-panel">
+          <p className="muted">Проверяю авторизацию...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!authUser) {
+    return (
+      <div className="shell auth-shell">
+        <div className="auth-hero">
+          <p className="eyebrow">AutoML access</p>
+          <h1>Вход в систему</h1>
+          <p className="lead">Авторизуйся, чтобы открыть загрузку датасета, обучение и predict.</p>
+        </div>
+        <form className="panel auth-panel" onSubmit={handleLogin}>
+          <label>
+            Username
+            <input value={loginUsername} onChange={(event) => setLoginUsername(event.target.value)} />
+          </label>
+          <label>
+            Password
+            <input type="password" value={loginPassword} onChange={(event) => setLoginPassword(event.target.value)} />
+          </label>
+          {loginError && <p className="error">{loginError}</p>}
+          <button type="submit" className="primary" disabled={loginBusy}>
+            {loginBusy ? 'Входим...' : 'Войти'}
+          </button>
+        </form>
+      </div>
+    );
   }
 
   return (
@@ -158,13 +315,22 @@ export function App() {
         </div>
         <div className="hero-card">
           <div className="stat">
+            <span>User</span>
+            <strong>{authUser.username}</strong>
+          </div>
+          <div className="stat">
             <span>Split default</span>
-            <strong>{defaultSplit.train}/{defaultSplit.val}/{defaultSplit.test}</strong>
+            <strong>
+              {defaultSplit.train}/{defaultSplit.val}/{defaultSplit.test}
+            </strong>
           </div>
           <div className="stat">
             <span>Selected models</span>
             <strong>{selectedModels.length}</strong>
           </div>
+          <button type="button" onClick={handleLogout}>
+            Выйти
+          </button>
         </div>
       </header>
 
@@ -179,6 +345,7 @@ export function App() {
               setStatus('');
               setError('');
               setTask(null);
+              setPrediction(null);
             }}
           />
           <div className="actions">
@@ -273,7 +440,9 @@ export function App() {
                 const split = classSplits[className] ?? DEFAULT_SPLIT;
                 return (
                   <div className="class-card" key={className}>
-                    <strong draggable onDragStart={(event) => handleDragStart(event, className)}>{className}</strong>
+                    <strong draggable onDragStart={(event) => handleDragStart(event, className)}>
+                      {className}
+                    </strong>
                     <div className="split-row compact">
                       {SPLIT_KEYS.map((field) => (
                         <label key={field}>
@@ -321,21 +490,58 @@ export function App() {
                 <div>
                   <p className="muted">Best</p>
                   <strong>
-                    {task.best_model ?? 'pending'} {task.best_accuracy ? `(${Math.round(task.best_accuracy * 10000) / 100}%)` : ''}
+                    {task.best_model ?? 'pending'}{' '}
+                    {task.best_accuracy ? `(${Math.round(task.best_accuracy * 10000) / 100}%)` : ''}
                   </strong>
                 </div>
               </div>
+              {task.best_params && Object.keys(task.best_params).length > 0 ? (
+                <div className="metric-block">
+                  <p className="muted">Best params</p>
+                  <pre>{JSON.stringify(task.best_params, null, 2)}</pre>
+                </div>
+              ) : null}
               {task.results?.length ? (
                 <div className="result-list">
                   {task.results.map((result) => (
                     <article className="result-item" key={result.model_name}>
-                      <strong>{result.model_name}</strong>
-                      {result.error ? (
-                        <span className="error">{result.error}</span>
-                      ) : (
-                        <span>{Math.round(result.accuracy * 10000) / 100}% accuracy</span>
-                      )}
-                      {!result.error && <pre>{JSON.stringify(result.params, null, 2)}</pre>}
+                      <div className="result-head">
+                        <strong>{result.model_name}</strong>
+                        {result.error ? (
+                          <span className="error">{result.error}</span>
+                        ) : (
+                          <span>{formatPercent(result.accuracy)} accuracy</span>
+                        )}
+                      </div>
+                      {!result.error ? (
+                        <div className="metric-grid">
+                          <Metric label="accuracy" value={formatPercent(result.accuracy)} />
+                          <Metric label="precision" value={formatPercent(result.precision)} />
+                          <Metric label="recall" value={formatPercent(result.recall)} />
+                          <Metric label="f1" value={formatPercent(result.f1_score)} />
+                          <Metric label="training_time" value={formatDuration(result.training_time)} />
+                          <Metric label="num_params" value={formatNumber(result.num_params)} />
+                          <Metric label="trainable_params" value={formatNumber(result.trainable_params)} />
+                          <Metric label="model_size_mb" value={formatFloat(result.model_size_mb)} />
+                          <Metric label="best_val_acc" value={formatPercent(result.best_val_acc)} />
+                          <Metric label="epochs_trained" value={formatNumber(result.epochs_trained)} />
+                          <Metric label="best_epoch" value={formatNumber(result.best_epoch)} />
+                          <Metric label="endpoint" value={result.endpoint ?? result.params?.endpoint ?? 'n/a'} />
+                          <Metric label="weights_file" value={result.weights_file ?? result.params?.weights_file ?? 'n/a'} />
+                        </div>
+                      ) : null}
+                      {!result.error && result.params ? (
+                        <div className="metric-block">
+                          <p className="muted">Params</p>
+                          <pre>{JSON.stringify(result.params, null, 2)}</pre>
+                        </div>
+                      ) : null}
+                      {!result.error && result.history ? (
+                        <div className="metric-block">
+                          <p className="muted">History</p>
+                          <pre>{JSON.stringify(result.history, null, 2)}</pre>
+                        </div>
+                      ) : null}
                     </article>
                   ))}
                 </div>
@@ -345,9 +551,90 @@ export function App() {
             <p className="muted">Здесь появится статус очереди и результат лучшей модели.</p>
           )}
         </section>
+
+        <section className="panel wide">
+          <h2>5. Predict</h2>
+          {task ? (
+            <div className="predict-grid">
+              <label>
+                Модель
+                <select value={predictModel} onChange={(event) => setPredictModel(event.target.value)}>
+                  <option value="">Выбери модель</option>
+                  {task.models.map((model) => (
+                    <option key={model} value={model}>
+                      {model}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Изображение
+                <input type="file" accept="image/*" onChange={(event) => setPredictFile(event.target.files?.[0] ?? null)} />
+              </label>
+              <button type="button" className="primary" onClick={handlePredict} disabled={predictBusy}>
+                {predictBusy ? 'Считаю...' : 'Predict'}
+              </button>
+            </div>
+          ) : (
+            <p className="muted">Сначала создай и дождись завершения задачи, чтобы открыть predict.</p>
+          )}
+          {predictError && <p className="error">{predictError}</p>}
+          {prediction ? (
+            <div className="result-item">
+              <div className="result-head">
+                <strong>{prediction.class_name}</strong>
+                <span>{formatPercent(prediction.confidence)} confidence</span>
+              </div>
+              <div className="metric-grid">
+                <Metric label="model" value={prediction.model} />
+                <Metric label="model_type" value={prediction.model_type} />
+                <Metric label="class_id" value={String(prediction.class_id)} />
+                <Metric label="confidence" value={formatPercent(prediction.confidence)} />
+              </div>
+              <pre>{JSON.stringify(prediction.probabilities, null, 2)}</pre>
+            </div>
+          ) : null}
+        </section>
       </main>
     </div>
   );
+}
+
+function Metric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="metric">
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function formatPercent(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'n/a';
+  }
+  return `${Math.round(value * 10000) / 100}%`;
+}
+
+function formatNumber(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'n/a';
+  }
+  return new Intl.NumberFormat('en-US').format(value);
+}
+
+function formatFloat(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'n/a';
+  }
+  return value.toFixed(2);
+}
+
+function formatDuration(value?: number): string {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return 'n/a';
+  }
+  return `${value.toFixed(1)}s`;
 }
 
 function dominantSplit(split: SplitRatio): 'train' | 'val' | 'test' {
