@@ -1,34 +1,28 @@
-export type ModelName = "resnet50" | "vgg" | "vit";
-export type MetricName = "accuracy" | "precision" | "recall" | "f1-macro";
-
-export interface SplitConfig { train: number; val: number; test: number; }
-
-export interface UploadDatasetResponse {
-  dataset_id: string; class_names: string[]; num_images: number;
+export async function createTask(input: CreateTaskInput): Promise<TaskResult> {
+  const formData = new FormData();
+  formData.append('archive', input.archive);
+  formData.append('models', JSON.stringify(input.models));
+  formData.append('split_config', JSON.stringify(input.splitConfig));
+  formData.append('primary_metric', input.primaryMetric);
+  if (input.advanced) {
+    formData.append('advanced_params', JSON.stringify(input.advanced));
+  }
+  const response = await fetch(`${API_URL}/api/tasks`, { method: 'POST', body: formData });
+  if (!response.ok) throw new Error(await readError(response));
+  return (await response.json()) as TaskResult;
 }
 
-export interface CreateJobRequest {
-  dataset_id: string; models: ModelName[]; split: SplitConfig;
-  epochs: number; learning_rate: number; batch_size: number;
+export async function downloadWeights(taskId: string, model: ModelName): Promise<Blob> {
+  const response = await fetch(`${API_URL}/api/tasks/${taskId}/weights/${model}`);
+  if (!response.ok) throw new Error(await readError(response));
+  return response.blob();
 }
-export interface CreateJobResponse { job_id: string; }
 
-export type ModelJobStatus = "pending" | "training" | "done" | "error";
-export interface ModelProgress {
-  name: ModelName; status: ModelJobStatus; epoch: number; progress: number;
+export function triggerDownload(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  link.click();
+  URL.revokeObjectURL(url);
 }
-export interface JobStatusResponse { status: ModelJobStatus; models: ModelProgress[]; }
-
-export interface EpochPoint {
-  epoch: number; train_loss: number; val_loss: number; train_acc: number; val_acc: number;
-}
-export interface ConfusionMatrix { labels: string[]; matrix: number[][]; }
-export interface TestMetrics { accuracy: number; precision: number; recall: number; f1: number; }
-export interface ModelResult {
-  name: ModelName; epoch_history: EpochPoint[]; confusion_matrix: ConfusionMatrix;
-  test_metrics: TestMetrics; train_time_sec: number; size_mb: number;
-}
-export interface JobResultsResponse { models: ModelResult[]; }
-
-export interface Prediction { model: ModelName; class: string; confidence: number; }
-export interface PredictResponse { predictions: Prediction[]; }
