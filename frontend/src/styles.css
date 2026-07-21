@@ -274,3 +274,25 @@ h1 {
     grid-template-columns: 1fr;
   }
 }
+
+/* .model-card теперь <label> с настоящим <input type="checkbox"> внутри —
+   чекбокс визуально спрятан, но остаётся в DOM для скринридеров и клавиатуры. */
+.model-card {
+  display: block;
+  cursor: pointer;
+  border-radius: 14px;
+  padding: 0.9rem 1.1rem;
+}
+
+.model-card input[type='checkbox'] {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+}
+
+.model-card:has(input:focus-visible) {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
