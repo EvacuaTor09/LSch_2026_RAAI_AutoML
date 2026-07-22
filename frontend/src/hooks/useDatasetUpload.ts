@@ -18,13 +18,13 @@ export function useDatasetUpload() {
     return null;
   }
 
-  async function inspectArchive(): Promise<number> {
+  async function inspectArchive(): Promise<string[]> {
     if (!archive) {
       throw new Error('Сначала выберите архив');
     }
     const discovered = await inspectDataset(archive);
     setClasses(discovered);
-    return discovered.length;
+    return discovered;
   }
 
   return { archive, classes, selectArchive, inspectArchive };

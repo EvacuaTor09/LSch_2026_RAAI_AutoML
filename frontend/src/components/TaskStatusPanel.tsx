@@ -41,12 +41,17 @@ export function TaskStatusPanel({ status, error, task }: TaskStatusPanelProps) {
               </strong>
             </div>
           </div>
+          {task.best_params && Object.keys(task.best_params).length > 0 && (
+            <div className="chart-block">
+              <h4>best_params</h4>
+              <pre className="raw-json">{JSON.stringify(task.best_params, null, 2)}</pre>
+            </div>
+          )}
           {task.results?.length ? (
             <div className="result-list">
               {task.results.map((result) => (
                 <ModelResultCard
                   key={result.model_name}
-                  taskId={task.id}
                   result={result}
                   isBest={result.model_name === task.best_model}
                 />

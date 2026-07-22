@@ -1,36 +1,33 @@
-import { useState } from 'react';
-import { downloadWeights, triggerDownload } from '../api';
-import type { ModelName, ModelResult } from '../types';
-import { ConfusionMatrixView } from './ConfusionMatrixView';
-import { TrainingCurvesChart } from './TrainingCurvesChart';
+import type { ModelResult } from '../types';
+import { TrainingChart } from './TrainingChart';
 
 type ModelResultCardProps = {
-  taskId: string;
   result: ModelResult;
   isBest: boolean;
 };
 
-function formatMetric(name: string, metricValue: number): string {
-  return name === 'loss' ? metricValue.toFixed(3) : `${Math.round(metricValue * 10000) / 100}%`;
+function formatPercent(value?: number): string {
+  return typeof value === 'number' && !Number.isNaN(value) ? `${Math.round(value * 10000) / 100}%` : '—';
 }
 
-export function ModelResultCard({ taskId, result, isBest }: ModelResultCardProps) {
-  const [downloading, setDownloading] = useState(false);
-  const [downloadError, setDownloadError] = useState('');
+function formatNumber(value?: number): string {
+  return typeof value === 'number' && !Number.isNaN(value) ? new Intl.NumberFormat('ru-RU').format(value) : '—';
+}
 
-  async function handleDownload() {
-    setDownloading(true);
-    setDownloadError('');
-    try {
-      const blob = await downloadWeights(taskId, result.model_name as ModelName);
-      triggerDownload(blob, `${result.model_name}-${taskId}.pt`);
-    } catch (error) {
-      setDownloadError(error instanceof Error ? error.message : 'Не удалось скачать веса');
-    } finally {
-      setDownloading(false);
-    }
-  }
+function formatFloat(value?: number): string {
+  return typeof value === 'number' && !Number.isNaN(value) ? value.toFixed(2) : '—';
+}
 
+function formatDuration(value?: number): string {
+  return typeof value === 'number' && !Number.isNaN(value) ? `${value.toFixed(1)} с` : '—';
+}
+
+// Раньше этот компонент скачивал веса с ручки /api/tasks/:id/weights/:model,
+// которой на бэке никогда не было (см. старый комментарий в api/tasks.ts) —
+// кнопка гарантированно падала с ошибкой. Ручки для скачивания весов на
+// бэке нет вообще, зато есть weights_file/endpoint в самом результате —
+// показываем их как есть, без обещания скачивания, которого нет.
+export function ModelResultCard({ result, isBest }: ModelResultCardProps) {
   if (result.error) {
     return (
       <article className="result-item">
@@ -40,35 +37,37 @@ export function ModelResultCard({ taskId, result, isBest }: ModelResultCardProps
     );
   }
 
-  // Пока бэкенд не всегда отдаёт полный набор metrics — показываем то, что
-  // точно есть (accuracy). Как только metrics появится в ответе целиком,
-  // здесь само подтянется весь набор без изменений в этом компоненте.
-  const metrics: Record<string, number> = result.metrics ?? { accuracy: result.accuracy };
-
   return (
     <article className={`result-item${isBest ? ' result-item--best' : ''}`}>
       <div className="result-item-head">
         <strong>
           {result.model_name} {isBest && <span className="best-badge">лучшая</span>}
         </strong>
-        <button type="button" onClick={handleDownload} disabled={downloading}>
-          {downloading ? 'Скачиваю…' : 'Скачать веса'}
-        </button>
       </div>
 
       <div className="metric-list">
-        {Object.entries(metrics).map(([name, metricValue]) => (
-          <span key={name} className="metric-pill">
-            {name}: {formatMetric(name, metricValue)}
-          </span>
-        ))}
+        <span className="metric-pill">accuracy: {formatPercent(result.accuracy)}</span>
+        <span className="metric-pill">precision: {formatPercent(result.precision)}</span>
+        <span className="metric-pill">recall: {formatPercent(result.recall)}</span>
+        <span className="metric-pill">f1: {formatPercent(result.f1_score)}</span>
+        <span className="metric-pill">best_val_acc: {formatPercent(result.best_val_acc)}</span>
+        <span className="metric-pill">training_time: {formatDuration(result.training_time)}</span>
+        <span className="metric-pill">epochs_trained: {formatNumber(result.epochs_trained)}</span>
+        <span className="metric-pill">best_epoch: {formatNumber(result.best_epoch)}</span>
+        <span className="metric-pill">num_params: {formatNumber(result.num_params)}</span>
+        <span className="metric-pill">trainable_params: {formatNumber(result.trainable_params)}</span>
+        <span className="metric-pill">model_size_mb: {formatFloat(result.model_size_mb)}</span>
       </div>
 
-      {downloadError && <p className="error">{downloadError}</p>}
+      {(result.endpoint || result.weights_file) && (
+        <p className="field-hint">
+          {result.endpoint && <>endpoint: {result.endpoint}</>}
+          {result.endpoint && result.weights_file && ' · '}
+          {result.weights_file && <>weights_file: {result.weights_file}</>}
+        </p>
+      )}
 
-      <TrainingCurvesChart history={result.history ?? []} metric="acc" title="Accuracy по эпохам" />
-      <TrainingCurvesChart history={result.history ?? []} metric="loss" title="Loss по эпохам" />
-      <ConfusionMatrixView data={result.confusion_matrix} />
+      <TrainingChart history={result.history} bestEpoch={result.best_epoch} />
     </article>
   );
 }

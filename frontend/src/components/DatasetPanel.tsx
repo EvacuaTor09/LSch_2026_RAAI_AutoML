@@ -31,10 +31,19 @@ export function DatasetPanel({ archive, classes, loading, onSelectArchive, onIns
           ))}
         </div>
       )}
-      <p className="field-hint">
-        Каждый верхний каталог в архиве — отдельный класс. Все классы участвуют во всех выборках (train/val/test) —
-        отдельно распределять их вручную не нужно.
-      </p>
+      <div className="hint-block">
+        <p className="muted">
+          Форматы: zip, jar, tar, tgz, rar, 7z. В корне архива — папки классов, внутри них картинки. Не кладите
+          готовые train/val/test — сплит система сделает сама. Нужно минимум 2 класса и лучше ≥4–5 фото на класс,
+          иначе val может получиться пустым.
+        </p>
+        <pre className="hint-pre">{`cats/
+  a.jpg
+  b.jpg
+dogs/
+  c.jpg
+  d.jpg`}</pre>
+      </div>
     </section>
   );
 }

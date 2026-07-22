@@ -3,6 +3,7 @@ import { createTask } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { DatasetPanel } from '../components/DatasetPanel';
 import { ModelsPanel } from '../components/ModelsPanel';
+import { PredictPanel } from '../components/PredictPanel';
 import { TrainingConfigPanel } from '../components/TrainingConfigPanel';
 import { TaskStatusPanel } from '../components/TaskStatusPanel';
 import { DEFAULT_SPLIT, useDatasetUpload } from '../hooks/useDatasetUpload';
@@ -17,6 +18,7 @@ export function DashboardPage() {
 
   const [selectedModels, setSelectedModels] = useState<ModelName[]>(ALL_MODELS);
   const [split, setSplit] = useState<SplitRatio>(DEFAULT_SPLIT);
+  const [classSplits, setClassSplits] = useState<Record<string, SplitRatio>>({});
   const [primaryMetric, setPrimaryMetric] = useState<MetricName>('f1');
   const [advanced, setAdvanced] = useState<AdvancedParams | undefined>(undefined);
 
@@ -33,6 +35,19 @@ export function DashboardPage() {
     setStatus('');
     setError(validationError ?? '');
     setTask(null);
+    setClassSplits({});
+  }
+
+  function handleSplitChange(next: SplitRatio) {
+    setSplit(next);
+  }
+
+  function handleClassSplitChange(className: string, next: SplitRatio) {
+    setClassSplits((current) => ({ ...current, [className]: next }));
+  }
+
+  function handleResetClassSplits() {
+    setClassSplits({});
   }
 
   async function handleInspect() {
@@ -40,8 +55,8 @@ export function DashboardPage() {
     setError('');
     setStatus('Анализирую классы в архиве…');
     try {
-      const count = await inspectArchive();
-      setStatus(`Найдено классов: ${count}`);
+      const discovered = await inspectArchive();
+      setStatus(`Найдено классов: ${discovered.length}`);
     } catch (inspectError) {
       setError(inspectError instanceof Error ? inspectError.message : 'Не удалось разобрать архив');
     } finally {
@@ -62,7 +77,13 @@ export function DashboardPage() {
     setError('');
     setStatus('Создаю задачу…');
     try {
-      const created = await createTask({ archive, models: selectedModels, split, primaryMetric, advanced });
+      const created = await createTask({
+        archive,
+        models: selectedModels,
+        splitConfig: { default: split, classes: classSplits },
+        primaryMetric,
+        advanced,
+      });
       setTask(created);
       setStatus(`Задача ${created.id} поставлена в очередь`);
     } catch (createError) {
@@ -76,7 +97,7 @@ export function DashboardPage() {
     <div className="shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">{skipAuth ? 'локальный режим' : 'AutoML orchestration'}</p>
+          <p className="eyebrow">{skipAuth ? 'локальный режим' : 'Аквариум · AutoML orchestration'}</p>
           <h1>Панель обучения моделей</h1>
           <p className="lead">
             Загрузите архив с датасетом, выберите модели и параметры обучения — оркестратор поднимет отдельный
@@ -117,7 +138,11 @@ export function DashboardPage() {
 
         <TrainingConfigPanel
           split={split}
-          onSplitChange={setSplit}
+          onSplitChange={handleSplitChange}
+          classes={classes}
+          classSplits={classSplits}
+          onClassSplitChange={handleClassSplitChange}
+          onResetClassSplits={handleResetClassSplits}
           primaryMetric={primaryMetric}
           onPrimaryMetricChange={setPrimaryMetric}
           advanced={advanced}
@@ -126,6 +151,8 @@ export function DashboardPage() {
           submitting={loading}
           onSubmit={handleCreateTask}
         />
+
+        <PredictPanel task={task} />
 
         <TaskStatusPanel status={status} error={error} task={task} />
       </main>
