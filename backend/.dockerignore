@@ -1,0 +1,8 @@
+storage
+**/*_test.go
+.git
+.gitignore
+README.md
+*.md
+.dockerignore
+Dockerfile

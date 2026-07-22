@@ -5,9 +5,11 @@ import (
 	"fmt"
 
 	"github.com/redis/go-redis/v9"
+	"lsch2026/backend/internal/auth"
 	"lsch2026/backend/internal/config"
 	"lsch2026/backend/internal/dataset"
 	"lsch2026/backend/internal/httpapi"
+	"lsch2026/backend/internal/modelclient"
 	"lsch2026/backend/internal/queue"
 	"lsch2026/backend/internal/store"
 )
@@ -34,15 +36,20 @@ func New(ctx context.Context, cfg config.Config) (*App, error) {
 		return nil, fmt.Errorf("init redis: %w", err)
 	}
 
+	authService := auth.NewService(storeConn, cfg.JWTSecret, cfg.TokenTTL)
+
 	datasetService := dataset.NewService(cfg.DataDir)
+	modelClient := modelclient.NewClient(cfg, redisClient)
 	taskQueue := queue.NewRedisQueue(redisClient, "automl:tasks")
 
 	application := &App{
 		router: httpapi.NewRouter(httpapi.Deps{
-			Config:  cfg,
-			Store:   storeConn,
-			Queue:   taskQueue,
-			Dataset: datasetService,
+			Config:      cfg,
+			Store:       storeConn,
+			Queue:       taskQueue,
+			Dataset:     datasetService,
+			Auth:        authService,
+			ModelClient: modelClient,
 		}),
 		store: storeConn,
 		redis: redisClient,

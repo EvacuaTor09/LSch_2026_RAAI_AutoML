@@ -9,8 +9,9 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"lsch2026/backend/internal/auth"
 	"lsch2026/backend/internal/domain"
+	_ "github.com/jackc/pgx/v5/stdlib"
 )
 
 type PostgresStore struct {
@@ -88,6 +89,12 @@ func (s *PostgresStore) List(ctx context.Context) ([]domain.Task, error) {
 
 func (s *PostgresStore) ensureSchema(ctx context.Context) error {
 	_, err := s.db.ExecContext(ctx, `
+		CREATE TABLE IF NOT EXISTS users (
+			username TEXT PRIMARY KEY,
+			password_hash TEXT NOT NULL,
+			created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+		);
+
 		CREATE TABLE IF NOT EXISTS tasks (
 			id TEXT PRIMARY KEY,
 			created_at TIMESTAMPTZ NOT NULL,
@@ -105,6 +112,33 @@ func (s *PostgresStore) ensureSchema(ctx context.Context) error {
 			completed_at TIMESTAMPTZ
 		)
 	`)
+	return err
+}
+
+func (s *PostgresStore) GetUser(ctx context.Context, username string) (auth.User, error) {
+	row := s.db.QueryRowContext(ctx, `
+		SELECT username, password_hash
+		FROM users
+		WHERE username = $1
+	`, username)
+
+	var user auth.User
+	if err := row.Scan(&user.Username, &user.PasswordHash); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return auth.User{}, sql.ErrNoRows
+		}
+		return auth.User{}, err
+	}
+	return user, nil
+}
+
+func (s *PostgresStore) UpsertUser(ctx context.Context, user auth.User) error {
+	_, err := s.db.ExecContext(ctx, `
+		INSERT INTO users (username, password_hash)
+		VALUES ($1, $2)
+		ON CONFLICT (username) DO UPDATE SET
+			password_hash = EXCLUDED.password_hash
+	`, user.Username, user.PasswordHash)
 	return err
 }
 

@@ -2,18 +2,32 @@
 
 :root {
   color-scheme: light;
-  --ink: #002b36;
-  --muted: #4a7482;
-  --line: rgba(0, 107, 138, 0.15);
-  --surface: rgba(240, 252, 255, 0.85);
-  --surface-strong: rgba(255, 255, 255, 0.95);
-  --accent: #008ba3;
-  --accent-soft: rgba(0, 139, 163, 0.12);
-  --danger: #d94b4b;
+
+  --ink: #072a33;
+  --bg: #e8f4f3;
+  --bg-elevated: #f3faf9;
+  --panel: rgba(255, 255, 255, 0.8);
+  --panel-solid: #ffffff;
+  --line: rgba(7, 42, 51, 0.13);
+  --text: #0d2b34;
+  --muted: #4f7079;
+  --text-h: #072a33;
+  --accent: #0d8a86;
+  --accent-soft: rgba(13, 138, 134, 0.13);
+  --accent-2: #12406b;
+  --accent-2-soft: rgba(18, 64, 107, 0.1);
+  --coral: #e2734f;
+  --coral-soft: rgba(226, 115, 79, 0.14);
+  --sand: #c9a869;
+  --danger: #b42318;
+  --danger-soft: rgba(180, 35, 24, 0.1);
+  --warn: #c17a1f;
+
+  --sans: 'DM Sans', system-ui, sans-serif;
+  --heading: 'Fraunces', Georgia, serif;
+  --mono: 'IBM Plex Mono', ui-monospace, Consolas, monospace;
   --radius: 18px;
-  --shadow: 0 20px 50px rgba(0, 43, 54, 0.1);
-  --font-body: 'DM Sans', sans-serif;
-  --font-display: 'Fraunces', Georgia, serif;
+  --shadow: 0 20px 50px rgba(21, 32, 40, 0.08);
 }
 
 * {
@@ -26,11 +40,16 @@ body {
   min-height: 100vh;
   color: var(--text);
   font-family: var(--sans);
-    background: 
-    radial-gradient(ellipse 80% 50% at 10% -10%, rgba(0, 180, 216, 0.15), transparent 55%),
-    radial-gradient(ellipse 60% 40% at 100% 0%, rgba(3, 117, 180, 0.1), transparent 50%),
-    linear-gradient(180deg, #e0f7fa 0%, #b2ebf2 45%, #80deea 100%);
-    background-attachment: fixed;
+  background:
+    radial-gradient(4px 4px at 12% 22%, rgba(255, 255, 255, 0.55), transparent 60%),
+    radial-gradient(3px 3px at 78% 64%, rgba(255, 255, 255, 0.45), transparent 60%),
+    radial-gradient(3px 3px at 34% 82%, rgba(255, 255, 255, 0.4), transparent 60%),
+    radial-gradient(5px 5px at 90% 18%, rgba(255, 255, 255, 0.4), transparent 60%),
+    radial-gradient(ellipse 85% 55% at 12% -10%, rgba(13, 138, 134, 0.18), transparent 55%),
+    radial-gradient(ellipse 65% 45% at 100% 0%, rgba(18, 64, 107, 0.14), transparent 50%),
+    linear-gradient(180deg, #e8f4f3 0%, #dcecea 45%, #eef7f6 100%);
+  background-attachment: fixed;
+  /* лёгкие "пузырьки" светом по фону — держим ненавязчиво, это фон, не декор поверх контента */
 }
 
 h1,
@@ -335,7 +354,7 @@ button:focus-visible,
   background: var(--accent-2);
 }
 .split-bar-test {
-  background: #c4a35a;
+  background: var(--sand);
 }
 
 /* -- toggle switches -- */
@@ -586,6 +605,77 @@ button:focus-visible,
   font-family: var(--sans);
 }
 
+/* -- dataset hint -- */
+
+.hint-block {
+  margin-top: 0.9rem;
+  padding: 0.9rem 1rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.hint-pre {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--accent-2);
+  background: var(--accent-2-soft);
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  overflow-x: auto;
+}
+
+/* -- per-class splits -- */
+
+.class-split-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.class-item {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 0.85rem;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.class-item-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+  font-size: 0.88rem;
+}
+
+/* -- charts / raw data -- */
+
+.chart-row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+  margin-top: 0.8rem;
+}
+
+.raw-json {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--text);
+  background: rgba(7, 42, 51, 0.05);
+  border-radius: 10px;
+  padding: 0.7rem 0.85rem;
+  overflow-x: auto;
+  max-height: 220px;
+}
+
+.best-badge {
+  background: var(--coral);
+}
+
 /* -- auth pages -- */
 
 .auth-shell {
@@ -638,7 +728,8 @@ button:focus-visible,
   .grid,
   .result-top,
   .split-row,
-  .actions {
+  .actions,
+  .chart-row {
     grid-template-columns: 1fr;
   }
 }

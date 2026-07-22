@@ -16,6 +16,9 @@ type Config struct {
 	RedisPass   string
 	RedisDB     int
 
+	JWTSecret     string
+	TokenTTL      time.Duration
+
 	APIBase string
 
 	ResNetReplicas []string
@@ -32,22 +35,24 @@ type Config struct {
 
 func Load() Config {
 	return Config{
-		HTTPAddr:       envOrDefault("HTTP_ADDR", ":8080"),
-		DataDir:        envOrDefault("DATA_DIR", "./storage"),
-		PostgresDSN:    envOrDefault("POSTGRES_DSN", "postgres://automl:automl@postgres:5432/automl?sslmode=disable"),
-		RedisAddr:      envOrDefault("REDIS_ADDR", "redis:6379"),
-		RedisPass:      envOrDefault("REDIS_PASSWORD", ""),
-		RedisDB:        envOrInt("REDIS_DB", 0),
-		APIBase:        envOrDefault("API_BASE", "http://localhost:8080"),
-		ResNetReplicas: envOrList("RESNET_REPLICAS", []string{"http://resnet-1:8000", "http://resnet-2:8000", "http://resnet-3:8000"}),
-		VGGReplicas:    envOrList("VGG_REPLICAS", []string{"http://vgg-1:8000", "http://vgg-2:8000", "http://vgg-3:8000"}),
-		ViTReplicas:    envOrList("VIT_REPLICAS", []string{"http://vit-1:8000", "http://vit-2:8000", "http://vit-3:8000"}),
-		TrainEpochs:    envOrInt("TRAIN_EPOCHS", 10),
-		BatchSize:      envOrInt("BATCH_SIZE", 32),
-		ImageSize:      envOrInt("IMAGE_SIZE", 224),
-		LearningRate:   envOrFloat("LEARNING_RATE", 0.001),
+		HTTPAddr:            envOrDefault("HTTP_ADDR", ":8080"),
+		DataDir:             envOrDefault("DATA_DIR", "./storage"),
+		PostgresDSN:         envOrDefault("POSTGRES_DSN", "postgres://automl:automl@postgres:5432/automl?sslmode=disable"),
+		RedisAddr:           envOrDefault("REDIS_ADDR", "redis:6379"),
+		RedisPass:           envOrDefault("REDIS_PASSWORD", ""),
+		RedisDB:             envOrInt("REDIS_DB", 0),
+		JWTSecret:           envOrDefault("JWT_SECRET", "dev-secret-change-me"),
+		TokenTTL:            envOrDuration("JWT_TTL", 24*time.Hour),
+		APIBase:             envOrDefault("API_BASE", "http://localhost:8080"),
+		ResNetReplicas:      envOrList("RESNET_REPLICAS", []string{"http://resnet-1:8000", "http://resnet-2:8000", "http://resnet-3:8000"}),
+		VGGReplicas:         envOrList("VGG_REPLICAS", []string{"http://vgg-1:8000", "http://vgg-2:8000", "http://vgg-3:8000"}),
+		ViTReplicas:         envOrList("VIT_REPLICAS", []string{"http://vit-1:8000", "http://vit-2:8000", "http://vit-3:8000"}),
+		TrainEpochs:         envOrInt("TRAIN_EPOCHS", 10),
+		BatchSize:           envOrInt("BATCH_SIZE", 32),
+		ImageSize:           envOrInt("IMAGE_SIZE", 224),
+		LearningRate:        envOrFloat("LEARNING_RATE", 0.001),
 		ModelRequestTimeout: envOrDuration("MODEL_REQUEST_TIMEOUT", 3*time.Hour),
-		LockTTLMillis:  envOrInt("REPLICA_LOCK_TTL_MS", 30*60*1000),
+		LockTTLMillis:       envOrInt("REPLICA_LOCK_TTL_MS", 30*60*1000),
 	}
 }
 

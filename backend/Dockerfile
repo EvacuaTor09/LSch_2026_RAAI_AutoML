@@ -1,10 +1,13 @@
 FROM golang:1.24-bookworm AS build
 WORKDIR /src
+
+# Only the packages imported by ./cmd/... are resolved — do not run go mod tidy
+# here (it walks the whole module tree and can pull unrelated deps from storage/).
+ENV GOTOOLCHAIN=local
 COPY go.mod ./
 COPY . .
-RUN go mod tidy
-RUN CGO_ENABLED=0 GOOS=linux go build -o /out/api ./cmd/api && \
-    CGO_ENABLED=0 GOOS=linux go build -o /out/worker ./cmd/worker
+RUN CGO_ENABLED=0 GOOS=linux go build -mod=mod -o /out/api ./cmd/api && \
+    CGO_ENABLED=0 GOOS=linux go build -mod=mod -o /out/worker ./cmd/worker
 
 FROM gcr.io/distroless/base-debian12
 WORKDIR /app
