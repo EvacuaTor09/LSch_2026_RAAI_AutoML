@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react';
 import { createTask } from './api';
+import { AdvancedSettings } from './components/AdvancedSettings';
 import { ModelPicker } from './components/ModelPicker';
 import { SplitEditor } from './components/SplitEditor';
 import { TaskStatusPanel } from './components/TaskStatusPanel';
 import { UploadPanel } from './components/UploadPanel';
 import { DEFAULT_SPLIT, useDatasetUpload } from './hooks/useDatasetUpload';
 import { useTaskPolling } from './hooks/useTaskPolling';
-import type { ModelName, SplitConfig, SplitRatio, TaskResult } from './types';
+import type { AdvancedParams, ModelName, SplitConfig, SplitRatio, TaskResult } from './types';
 
 export function App() {
   const { archive, classes, classSplits, setClassSplits, selectArchive, inspectArchive } = useDatasetUpload();
@@ -17,6 +18,7 @@ export function App() {
     'vit_base_patch16_224',
   ]);
   const [defaultSplit, setDefaultSplit] = useState<SplitRatio>(DEFAULT_SPLIT);
+  const [advanced, setAdvanced] = useState<AdvancedParams | undefined>(undefined);
   const [task, setTask] = useState<TaskResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
@@ -62,14 +64,14 @@ export function App() {
       return;
     }
     if (!selectedModels.length) {
-      setError('Выберите хотя бы одну модель');
+      setError('Выбери хотя бы одну модель');
       return;
     }
     setLoading(true);
     setError('');
     setStatus('Создаю задачу');
     try {
-      const created = await createTask({ archive, models: selectedModels, splitConfig });
+      const created = await createTask({ archive, models: selectedModels, splitConfig, advanced });
       setTask(created);
       setStatus(`Задача ${created.id} поставлена в очередь`);
     } catch (createError) {
@@ -139,6 +141,8 @@ export function App() {
           onClassFieldChange={handleClassFieldChange}
           onClassBucketChange={handleClassBucketChange}
         />
+
+        <AdvancedSettings value={advanced} onChange={setAdvanced} />
 
         <TaskStatusPanel status={status} error={error} task={task} />
       </main>

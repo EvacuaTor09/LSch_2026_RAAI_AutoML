@@ -9,22 +9,22 @@ type TaskStatusPanelProps = {
 export function TaskStatusPanel({ status, error, task }: TaskStatusPanelProps) {
   return (
     <section className="panel wide">
-      <h2>4. Статус выполнения</h2>
+      <h2>5. Статус задачи</h2>
       {status && <p className="muted">{status}</p>}
       {error && <p className="error">{error}</p>}
       {task ? (
         <div className="result-card">
           <div className="result-top">
             <div>
-              <p className="muted">Task ID</p>
+              <p className="muted">ID задачи</p>
               <strong>{task.id}</strong>
             </div>
             <div>
-              <p className="muted">Status</p>
+              <p className="muted">Статус</p>
               <strong>{task.status}</strong>
             </div>
             <div>
-              <p className="muted">Best</p>
+              <p className="muted">Лучший результат</p>
               <strong>
                 {task.best_model ?? 'pending'}{' '}
                 {task.best_accuracy ? `(${Math.round(task.best_accuracy * 10000) / 100}%)` : ''}
