@@ -20,6 +20,33 @@ export type AuthUser = {
 	username: string;
 };
 
+export type TrainingHistory = {
+  train_loss?: number[];
+  val_loss?: number[];
+  val_acc?: number[];
+  val_f1?: number[];
+};
+
+export type ModelRunResult = {
+  model_name: string;
+  accuracy: number;
+  precision?: number;
+  recall?: number;
+  f1_score?: number;
+  training_time?: number;
+  num_params?: number;
+  trainable_params?: number;
+  model_size_mb?: number;
+  weights_file?: string;
+  best_val_acc?: number;
+  epochs_trained?: number;
+  best_epoch?: number;
+  history?: TrainingHistory | Record<string, unknown>;
+  endpoint?: string;
+  params: Record<string, string>;
+  error?: string;
+};
+
 export type TaskResult = {
   id: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
@@ -29,25 +56,7 @@ export type TaskResult = {
   best_accuracy?: number;
   best_params?: Record<string, string>;
   error?: string;
-  results?: Array<{
-    model_name: string;
-    accuracy: number;
-    precision?: number;
-    recall?: number;
-    f1_score?: number;
-    training_time?: number;
-    num_params?: number;
-    trainable_params?: number;
-    model_size_mb?: number;
-    weights_file?: string;
-    best_val_acc?: number;
-    epochs_trained?: number;
-    best_epoch?: number;
-    history?: Record<string, unknown>;
-    endpoint?: string;
-    params: Record<string, string>;
-    error?: string;
-  }>;
+  results?: ModelRunResult[];
 };
 
 export type TopPrediction = {
@@ -80,5 +89,5 @@ export type PredictionResult = {
 	num_params?: number;
 	trainable_params?: number;
 	model_size_mb?: number;
-	history?: Record<string, unknown>;
+	history?: TrainingHistory | Record<string, unknown>;
 };

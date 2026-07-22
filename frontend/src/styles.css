@@ -528,6 +528,110 @@ label {
   justify-items: stretch;
 }
 
+.metric-groups {
+  width: 100%;
+  display: grid;
+  gap: 1rem;
+}
+
+.metric-group {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem 0 0;
+  border-top: 1px solid var(--line);
+}
+
+.metric-group:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+
+.metric-group h3 {
+  margin: 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.chart-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.chart-card {
+  display: grid;
+  gap: 0.55rem;
+  padding: 0.85rem;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.chart-card-head {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  align-items: baseline;
+}
+
+.chart-card-head strong {
+  font-size: 0.95rem;
+}
+
+.chart-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.chart-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.chart-legend i {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.chart-svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.chart-grid {
+  stroke: rgba(21, 32, 40, 0.08);
+  stroke-width: 1;
+}
+
+.chart-axis {
+  stroke: rgba(21, 32, 40, 0.22);
+  stroke-width: 1.2;
+}
+
+.chart-best {
+  stroke: rgba(180, 35, 24, 0.55);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+
+.chart-label {
+  fill: var(--muted);
+  font-size: 10px;
+  font-family: var(--font-body);
+}
+
 pre {
   margin: 0;
   width: 100%;
@@ -539,6 +643,24 @@ pre {
   font-size: 0.82rem;
   line-height: 1.45;
   text-align: left;
+}
+
+.hint-block {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.hint-pre {
+  width: fit-content;
+  max-width: 100%;
+  margin: 0;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: rgba(21, 32, 40, 0.05);
+  border: 1px solid var(--line);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  white-space: pre;
 }
 
 .error {
@@ -563,7 +685,8 @@ pre {
   .row.predict,
   .bucket-grid,
   .split-row,
-  .metric-grid {
+  .metric-grid,
+  .chart-row {
     grid-template-columns: 1fr;
   }
 

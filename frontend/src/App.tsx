@@ -1,5 +1,5 @@
 import { useEffect, useId, useMemo, useState } from 'react';
-import type { ChangeEvent, FormEvent } from 'react';
+import type { ChangeEvent, FormEvent, ReactNode } from 'react';
 import {
   clearAuthToken,
   createTask,
@@ -16,10 +16,12 @@ import {
 import type {
   AuthUser,
   ModelName,
+  ModelRunResult,
   PredictionResult,
   SplitConfig,
   SplitRatio,
   TaskResult,
+  TrainingHistory,
 } from './types';
 
 const MODELS: Array<{ id: ModelName; title: string; hint: string }> = [
@@ -347,7 +349,19 @@ export function App() {
               Создать задачу
             </button>
           </div>
-          <p className="muted">zip, jar, tar, tgz, rar, 7z — каждый верхний каталог это класс.</p>
+          <div className="hint-block">
+            <p className="muted">
+              Форматы: zip, jar, tar, tgz, rar, 7z. В корне архива — папки классов, внутри них картинки. Не клади готовые
+              train/val/test: сплит система сделает сама. Нужно минимум 2 класса и лучше ≥4–5 фото на класс, иначе val
+              может получиться пустым.
+            </p>
+            <pre className="hint-pre">{`cats/
+  a.jpg
+  b.jpg
+dogs/
+  c.jpg
+  d.jpg`}</pre>
+          </div>
         </section>
 
         <section className="section">
@@ -476,54 +490,10 @@ export function App() {
                   </strong>
                 </div>
               </div>
-              {task.best_params && Object.keys(task.best_params).length > 0 ? (
-                <div className="metric-block">
-                  <p>best_params</p>
-                  <pre>{JSON.stringify(task.best_params, null, 2)}</pre>
-                </div>
-              ) : null}
               {task.results?.length ? (
                 <div className="result-list">
                   {task.results.map((result) => (
-                    <article className="result-block" key={result.model_name}>
-                      <div className="result-head">
-                        <strong>{result.model_name}</strong>
-                        {result.error ? (
-                          <span className="error">{result.error}</span>
-                        ) : (
-                          <span>{formatPercent(result.accuracy)} accuracy</span>
-                        )}
-                      </div>
-                      {!result.error ? (
-                        <div className="metric-grid">
-                          <Metric label="accuracy" value={formatPercent(result.accuracy)} />
-                          <Metric label="precision" value={formatPercent(result.precision)} />
-                          <Metric label="recall" value={formatPercent(result.recall)} />
-                          <Metric label="f1_score" value={formatPercent(result.f1_score)} />
-                          <Metric label="training_time" value={formatDuration(result.training_time)} />
-                          <Metric label="num_params" value={formatNumber(result.num_params)} />
-                          <Metric label="trainable_params" value={formatNumber(result.trainable_params)} />
-                          <Metric label="model_size_mb" value={formatFloat(result.model_size_mb)} />
-                          <Metric label="best_val_acc" value={formatPercent(result.best_val_acc)} />
-                          <Metric label="epochs_trained" value={formatNumber(result.epochs_trained)} />
-                          <Metric label="best_epoch" value={formatNumber(result.best_epoch)} />
-                          <Metric label="endpoint" value={result.endpoint ?? result.params?.endpoint ?? 'n/a'} />
-                          <Metric label="weights_file" value={result.weights_file ?? result.params?.weights_file ?? 'n/a'} />
-                        </div>
-                      ) : null}
-                      {!result.error && result.params ? (
-                        <div className="metric-block">
-                          <p>params</p>
-                          <pre>{JSON.stringify(result.params, null, 2)}</pre>
-                        </div>
-                      ) : null}
-                      {!result.error && result.history ? (
-                        <div className="metric-block">
-                          <p>history</p>
-                          <pre>{JSON.stringify(result.history, null, 2)}</pre>
-                        </div>
-                      ) : null}
-                    </article>
+                    <ModelResultCard key={result.model_name} result={result} />
                   ))}
                 </div>
               ) : null}
@@ -573,6 +543,49 @@ export function App() {
   );
 }
 
+function ModelResultCard({ result }: { result: ModelRunResult }) {
+  const history = asTrainingHistory(result.history);
+  const bestValLoss = bestEpochValue(history?.val_loss, result.best_epoch);
+
+  return (
+    <article className="result-block">
+      <div className="result-head">
+        <strong>{result.model_name}</strong>
+        {result.error ? (
+          <span className="error">{result.error}</span>
+        ) : (
+          <span>{formatPercent(result.accuracy)} accuracy</span>
+        )}
+      </div>
+      {result.error ? null : (
+        <>
+          <div className="metric-groups">
+            <MetricGroup title="Метрики">
+              <Metric label="accuracy" value={formatPercent(result.accuracy)} />
+              <Metric label="precision" value={formatPercent(result.precision)} />
+              <Metric label="recall" value={formatPercent(result.recall)} />
+              <Metric label="F1" value={formatPercent(result.f1_score)} />
+            </MetricGroup>
+            <MetricGroup title="Инфо про модель">
+              <Metric label="параметры" value={formatNumber(result.num_params)} />
+              <Metric label="обучаемые параметры" value={formatNumber(result.trainable_params)} />
+              <Metric label="время обучения" value={formatDuration(result.training_time)} />
+              <Metric label="вес модели, Мб" value={formatFloat(result.model_size_mb)} />
+            </MetricGroup>
+            <MetricGroup title="Статистика обучения">
+              <Metric label="эпохи" value={formatNumber(result.epochs_trained)} />
+              <Metric label="лучшая эпоха" value={formatNumber(result.best_epoch)} />
+              <Metric label="val loss (лучшая эпоха)" value={formatFloat(bestValLoss)} />
+              <Metric label="val accuracy" value={formatPercent(result.best_val_acc)} />
+            </MetricGroup>
+          </div>
+          <TrainingCharts history={history} bestEpoch={result.best_epoch} />
+        </>
+      )}
+    </article>
+  );
+}
+
 function FilePicker({
   accept,
   file,
@@ -608,6 +621,8 @@ function FilePicker({
 
 function PredictionCard({ prediction }: { prediction: PredictionResult }) {
   const hasTrainMetrics = typeof prediction.accuracy === 'number';
+  const history = asTrainingHistory(prediction.history);
+  const bestValLoss = bestEpochValue(history?.val_loss, prediction.best_epoch);
 
   return (
     <div className="result-block">
@@ -615,29 +630,44 @@ function PredictionCard({ prediction }: { prediction: PredictionResult }) {
         <strong>{prediction.class_name}</strong>
         <span>{formatPercent(prediction.confidence)} confidence</span>
       </div>
-      <div className="metric-grid">
-        <Metric label="model" value={prediction.model} />
-        <Metric label="model_type" value={prediction.model_type} />
-        <Metric label="class_id" value={String(prediction.class_id)} />
-        <Metric label="class_name" value={prediction.class_name} />
-        <Metric label="confidence" value={formatPercent(prediction.confidence)} />
-        <Metric label="num_classes" value={formatNumber(prediction.num_classes)} />
-        <Metric label="num_params" value={formatNumber(prediction.num_params)} />
-        <Metric label="trainable_params" value={formatNumber(prediction.trainable_params)} />
-        <Metric label="model_size_mb" value={formatFloat(prediction.model_size_mb)} />
+      <div className="metric-groups">
+        <MetricGroup title="Предсказание">
+          <Metric label="model" value={prediction.model} />
+          <Metric label="model_type" value={prediction.model_type} />
+          <Metric label="class_id" value={String(prediction.class_id)} />
+          <Metric label="class_name" value={prediction.class_name} />
+          <Metric label="confidence" value={formatPercent(prediction.confidence)} />
+          <Metric label="num_classes" value={formatNumber(prediction.num_classes)} />
+        </MetricGroup>
         {hasTrainMetrics ? (
           <>
-            <Metric label="accuracy" value={formatPercent(prediction.accuracy)} />
-            <Metric label="precision" value={formatPercent(prediction.precision)} />
-            <Metric label="recall" value={formatPercent(prediction.recall)} />
-            <Metric label="f1_score" value={formatPercent(prediction.f1_score)} />
-            <Metric label="training_time" value={formatDuration(prediction.training_time)} />
-            <Metric label="epochs_trained" value={formatNumber(prediction.epochs_trained)} />
-            <Metric label="best_epoch" value={formatNumber(prediction.best_epoch)} />
-            <Metric label="best_val_acc" value={formatPercent(prediction.best_val_acc)} />
-            <Metric label="task_id" value={prediction.task_id ?? 'n/a'} />
+            <MetricGroup title="Метрики">
+              <Metric label="accuracy" value={formatPercent(prediction.accuracy)} />
+              <Metric label="precision" value={formatPercent(prediction.precision)} />
+              <Metric label="recall" value={formatPercent(prediction.recall)} />
+              <Metric label="F1" value={formatPercent(prediction.f1_score)} />
+            </MetricGroup>
+            <MetricGroup title="Инфо про модель">
+              <Metric label="параметры" value={formatNumber(prediction.num_params)} />
+              <Metric label="обучаемые параметры" value={formatNumber(prediction.trainable_params)} />
+              <Metric label="время обучения" value={formatDuration(prediction.training_time)} />
+              <Metric label="вес модели, Мб" value={formatFloat(prediction.model_size_mb)} />
+            </MetricGroup>
+            <MetricGroup title="Статистика обучения">
+              <Metric label="эпохи" value={formatNumber(prediction.epochs_trained)} />
+              <Metric label="лучшая эпоха" value={formatNumber(prediction.best_epoch)} />
+              <Metric label="val loss (лучшая эпоха)" value={formatFloat(bestValLoss)} />
+              <Metric label="val accuracy" value={formatPercent(prediction.best_val_acc)} />
+              <Metric label="task_id" value={prediction.task_id ?? 'n/a'} />
+            </MetricGroup>
           </>
-        ) : null}
+        ) : (
+          <MetricGroup title="Инфо про модель">
+            <Metric label="параметры" value={formatNumber(prediction.num_params)} />
+            <Metric label="обучаемые параметры" value={formatNumber(prediction.trainable_params)} />
+            <Metric label="вес модели, Мб" value={formatFloat(prediction.model_size_mb)} />
+          </MetricGroup>
+        )}
       </div>
       {prediction.top_predictions?.length ? (
         <div className="metric-block">
@@ -653,12 +683,157 @@ function PredictionCard({ prediction }: { prediction: PredictionResult }) {
           </div>
         </div>
       ) : null}
-      {prediction.history ? (
-        <div className="metric-block">
-          <p>history</p>
-          <pre>{JSON.stringify(prediction.history, null, 2)}</pre>
-        </div>
+      {hasTrainMetrics ? <TrainingCharts history={history} bestEpoch={prediction.best_epoch} /> : null}
+    </div>
+  );
+}
+
+function MetricGroup({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <div className="metric-group">
+      <h3>{title}</h3>
+      <div className="metric-grid">{children}</div>
+    </div>
+  );
+}
+
+function TrainingCharts({ history, bestEpoch }: { history?: TrainingHistory; bestEpoch?: number }) {
+  if (!history) {
+    return null;
+  }
+
+  const trainLoss = toNumberSeries(history.train_loss);
+  const valLoss = toNumberSeries(history.val_loss);
+  const valAcc = toNumberSeries(history.val_acc);
+  const hasLoss = trainLoss.length > 0 || valLoss.length > 0;
+  const hasAcc = valAcc.length > 0;
+
+  if (!hasLoss && !hasAcc) {
+    return null;
+  }
+
+  return (
+    <div className="chart-row">
+      {hasLoss ? (
+        <LineChart
+          title="Loss по эпохам"
+          series={[
+            { label: 'train loss', values: trainLoss, color: '#0f766e' },
+            { label: 'val loss', values: valLoss, color: '#1e4064' },
+          ]}
+          bestEpoch={bestEpoch}
+        />
       ) : null}
+      {hasAcc ? (
+        <LineChart
+          title="Accuracy по эпохам"
+          series={[{ label: 'val accuracy', values: valAcc, color: '#0f766e' }]}
+          bestEpoch={bestEpoch}
+          yAsPercent
+        />
+      ) : null}
+    </div>
+  );
+}
+
+function LineChart({
+  title,
+  series,
+  bestEpoch,
+  yAsPercent = false,
+}: {
+  title: string;
+  series: Array<{ label: string; values: number[]; color: string }>;
+  bestEpoch?: number;
+  yAsPercent?: boolean;
+}) {
+  const width = 560;
+  const height = 220;
+  const pad = { top: 18, right: 16, bottom: 32, left: 48 };
+  const innerW = width - pad.left - pad.right;
+  const innerH = height - pad.top - pad.bottom;
+
+  const lengths = series.map((item) => item.values.length).filter((n) => n > 0);
+  const epochs = lengths.length ? Math.max(...lengths) : 0;
+  if (epochs === 0) {
+    return null;
+  }
+
+  const allValues = series.flatMap((item) => item.values);
+  let yMin = Math.min(...allValues);
+  let yMax = Math.max(...allValues);
+  if (yMin === yMax) {
+    yMin -= yAsPercent ? 0.05 : 0.1;
+    yMax += yAsPercent ? 0.05 : 0.1;
+  }
+  const yPad = (yMax - yMin) * 0.08;
+  yMin -= yPad;
+  yMax += yPad;
+
+  const xAt = (index: number) => pad.left + (epochs === 1 ? innerW / 2 : (index / (epochs - 1)) * innerW);
+  const yAt = (value: number) => pad.top + ((yMax - value) / (yMax - yMin)) * innerH;
+
+  const yTicks = 4;
+  const ticks = Array.from({ length: yTicks + 1 }, (_, i) => yMin + ((yMax - yMin) * i) / yTicks);
+
+  return (
+    <div className="chart-card">
+      <div className="chart-card-head">
+        <strong>{title}</strong>
+        <div className="chart-legend">
+          {series
+            .filter((item) => item.values.length > 0)
+            .map((item) => (
+              <span key={item.label}>
+                <i style={{ background: item.color }} />
+                {item.label}
+              </span>
+            ))}
+        </div>
+      </div>
+      <svg className="chart-svg" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={title}>
+        {ticks.map((tick) => {
+          const y = yAt(tick);
+          return (
+            <g key={`tick-${tick}`}>
+              <line x1={pad.left} y1={y} x2={width - pad.right} y2={y} className="chart-grid" />
+              <text x={pad.left - 8} y={y + 3} textAnchor="end" className="chart-label">
+                {yAsPercent ? formatPercent(tick) : tick.toFixed(2)}
+              </text>
+            </g>
+          );
+        })}
+        <line x1={pad.left} y1={pad.top + innerH} x2={width - pad.right} y2={pad.top + innerH} className="chart-axis" />
+        <line x1={pad.left} y1={pad.top} x2={pad.left} y2={pad.top + innerH} className="chart-axis" />
+        {series.map((item) => {
+          if (item.values.length === 0) {
+            return null;
+          }
+          const points = item.values.map((value, index) => `${xAt(index)},${yAt(value)}`).join(' ');
+          return (
+            <g key={item.label}>
+              <polyline fill="none" stroke={item.color} strokeWidth="2.5" points={points} />
+              {item.values.map((value, index) => (
+                <circle key={`${item.label}-${index}`} cx={xAt(index)} cy={yAt(value)} r="3.2" fill={item.color} />
+              ))}
+            </g>
+          );
+        })}
+        {typeof bestEpoch === 'number' && bestEpoch >= 1 && bestEpoch <= epochs ? (
+          <line
+            x1={xAt(bestEpoch - 1)}
+            y1={pad.top}
+            x2={xAt(bestEpoch - 1)}
+            y2={pad.top + innerH}
+            className="chart-best"
+          />
+        ) : null}
+        {Array.from({ length: epochs }, (_, index) => (
+          <text key={`ep-${index}`} x={xAt(index)} y={height - 10} textAnchor="middle" className="chart-label">
+            {index + 1}
+          </text>
+        ))}
+      </svg>
     </div>
   );
 }
@@ -715,6 +890,34 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function asTrainingHistory(history?: TrainingHistory | Record<string, unknown>): TrainingHistory | undefined {
+  if (!history || typeof history !== 'object') {
+    return undefined;
+  }
+  return {
+    train_loss: toNumberSeries((history as TrainingHistory).train_loss ?? (history as Record<string, unknown>).train_loss),
+    val_loss: toNumberSeries((history as TrainingHistory).val_loss ?? (history as Record<string, unknown>).val_loss),
+    val_acc: toNumberSeries((history as TrainingHistory).val_acc ?? (history as Record<string, unknown>).val_acc),
+    val_f1: toNumberSeries((history as TrainingHistory).val_f1 ?? (history as Record<string, unknown>).val_f1),
+  };
+}
+
+function toNumberSeries(value: unknown): number[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+  return value
+    .map((item) => (typeof item === 'number' ? item : Number(item)))
+    .filter((item) => Number.isFinite(item));
+}
+
+function bestEpochValue(series: number[] | undefined, bestEpoch?: number): number | undefined {
+  if (!series?.length || typeof bestEpoch !== 'number' || bestEpoch < 1) {
+    return undefined;
+  }
+  return series[bestEpoch - 1];
 }
 
 function formatPercent(value?: number): string {
