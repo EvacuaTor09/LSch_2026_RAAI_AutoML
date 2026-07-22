@@ -1,12 +1,10 @@
 function resolveApiURL(): string {
   const fromEnv = import.meta.env.VITE_API_URL?.trim();
   if (fromEnv) {
-    return fromEnv;
+    return fromEnv.replace(/\/$/, '');
   }
-  if (typeof window !== 'undefined') {
-    return `${window.location.protocol}//${window.location.hostname}:8080`;
-  }
-  return 'http://localhost:8080';
+  // Пустая строка — same-origin: Vite proxy в dev, nginx /api в prod.
+  return '';
 }
 
 export const API_URL = resolveApiURL();

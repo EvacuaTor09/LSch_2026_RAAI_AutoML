@@ -11,8 +11,8 @@ export function RegisterPage() {
       title="Регистрация"
       submitLabel="Создать аккаунт"
       pendingLabel="Создаём аккаунт…"
-      onSubmit={async (email, password) => {
-        await register({ email, password });
+      onSubmit={async (username, password) => {
+        await register({ username, password });
         navigate('/', { replace: true });
       }}
       footer={

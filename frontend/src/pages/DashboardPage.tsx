@@ -12,7 +12,7 @@ import type { AdvancedParams, MetricName, ModelName, SplitRatio, TaskResult } fr
 const ALL_MODELS: ModelName[] = ['resnet50', 'vgg16', 'vit_base_patch16_224'];
 
 export function DashboardPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, skipAuth } = useAuth();
   const { archive, classes, selectArchive, inspectArchive } = useDatasetUpload();
 
   const [selectedModels, setSelectedModels] = useState<ModelName[]>(ALL_MODELS);
@@ -76,7 +76,7 @@ export function DashboardPage() {
     <div className="shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">AutoML orchestration</p>
+          <p className="eyebrow">{skipAuth ? 'локальный режим' : 'AutoML orchestration'}</p>
           <h1>Панель обучения моделей</h1>
           <p className="lead">
             Загрузите архив с датасетом, выберите модели и параметры обучения — оркестратор поднимет отдельный
@@ -86,7 +86,7 @@ export function DashboardPage() {
         <div className="hero-card">
           <div className="stat">
             <span>Аккаунт</span>
-            <strong>{user?.email ?? 'вы'}</strong>
+            <strong>{user?.username ?? 'вы'}</strong>
           </div>
           <div className="stat">
             <span>Split по умолчанию</span>
@@ -94,9 +94,13 @@ export function DashboardPage() {
               {split.train}/{split.val}/{split.test}
             </strong>
           </div>
-          <button type="button" onClick={logout} className="logout-button">
-            Выйти
-          </button>
+          {!skipAuth ? (
+            <button type="button" onClick={logout} className="logout-button">
+              Выйти
+            </button>
+          ) : (
+            <p className="field-hint">Auth отключён — VITE_SKIP_AUTH=true</p>
+          )}
         </div>
       </header>
 

@@ -1,9 +1,5 @@
-import type { AuthResponse, LoginInput, RegisterInput } from '../types';
-import { API_URL, readError } from './client';
-
-// Предположение по контракту, пока бэк его не прислал: JSON-body,
-// в ответ { token, user }. Ручки — /api/auth/login и /api/auth/register.
-// Поправить URL/тела запросов здесь, если бэкендеры сделают иначе.
+import type { AuthResponse, AuthUser, LoginInput, RegisterInput } from '../types';
+import { API_URL, authHeaders, readError } from './client';
 
 export async function login(input: LoginInput): Promise<AuthResponse> {
   const response = await fetch(`${API_URL}/api/auth/login`, {
@@ -27,4 +23,14 @@ export async function register(input: RegisterInput): Promise<AuthResponse> {
     throw new Error(await readError(response));
   }
   return (await response.json()) as AuthResponse;
+}
+
+export async function me(): Promise<AuthUser> {
+  const response = await fetch(`${API_URL}/api/auth/me`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+  return (await response.json()) as AuthUser;
 }

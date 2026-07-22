@@ -76,28 +76,23 @@ export type TaskResult = {
 };
 
 // --- Авторизация ---
-// ВНИМАНИЕ: контракт /api/auth/* бэком пока не согласован (в присланных
-// требованиях к API его вообще нет). Формы и типы ниже — рабочее
-// предположение по аналогии с тем, как уже сделаны остальные ручки
-// (JSON-тело, { error } при ошибке). Как только бэкендеры пришлют реальную
-// схему — поправить authRequest в src/api/auth.ts, остального касаться не
-// придётся.
+// Контракт как у бэкенда: username/password, ответ { token, username }.
+// Ручки: /api/auth/login, /api/auth/register, /api/auth/me
 export type AuthUser = {
-  id: string;
-  email: string;
+  username: string;
 };
 
 export type AuthResponse = {
   token: string;
-  user: AuthUser;
+  username: string;
 };
 
 export type LoginInput = {
-  email: string;
+  username: string;
   password: string;
 };
 
 export type RegisterInput = {
-  email: string;
+  username: string;
   password: string;
 };

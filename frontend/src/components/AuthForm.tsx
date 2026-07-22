@@ -5,12 +5,12 @@ type AuthFormProps = {
   title: string;
   submitLabel: string;
   pendingLabel: string;
-  onSubmit: (email: string, password: string) => Promise<void>;
+  onSubmit: (username: string, password: string) => Promise<void>;
   footer: React.ReactNode;
 };
 
 export function AuthForm({ title, submitLabel, pendingLabel, onSubmit, footer }: AuthFormProps) {
-  const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [pending, setPending] = useState(false);
   const [error, setError] = useState('');
@@ -20,7 +20,7 @@ export function AuthForm({ title, submitLabel, pendingLabel, onSubmit, footer }:
     setPending(true);
     setError('');
     try {
-      await onSubmit(email, password);
+      await onSubmit(username, password);
     } catch (submitError) {
       setError(submitError instanceof Error ? submitError.message : 'Что-то пошло не так');
     } finally {
@@ -35,13 +35,13 @@ export function AuthForm({ title, submitLabel, pendingLabel, onSubmit, footer }:
         <h1 className="auth-title">{title}</h1>
 
         <label className="text-field">
-          Email
+          Username
           <input
-            type="email"
+            type="text"
             required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="username"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
           />
         </label>
 

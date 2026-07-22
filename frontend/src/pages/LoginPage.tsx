@@ -11,8 +11,8 @@ export function LoginPage() {
       title="Вход"
       submitLabel="Войти"
       pendingLabel="Входим…"
-      onSubmit={async (email, password) => {
-        await login({ email, password });
+      onSubmit={async (username, password) => {
+        await login({ username, password });
         navigate('/', { replace: true });
       }}
       footer={

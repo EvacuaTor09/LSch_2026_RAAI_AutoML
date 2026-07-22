@@ -5,7 +5,10 @@ export async function createTask(input: CreateTaskInput): Promise<TaskResult> {
   const formData = new FormData();
   formData.append('archive', input.archive);
   formData.append('models', JSON.stringify(input.models));
-  formData.append('split_config', JSON.stringify(input.split));
+  formData.append(
+    'split_config',
+    JSON.stringify({ default: input.split, classes: {} }),
+  );
   formData.append('primary_metric', input.primaryMetric);
   // advanced_params — опционально. Если пользователь не включил расширенный
   // режим, поле вообще не уходит и бэк применяет свои значения по умолчанию.
