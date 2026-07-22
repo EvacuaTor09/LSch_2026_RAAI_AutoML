@@ -19,3 +19,27 @@ export async function readError(response: Response): Promise<string> {
     return response.statusText;
   }
 }
+
+// --- Токен авторизации ---
+// Храним в localStorage (переживает перезагрузку страницы) и добавляем
+// заголовок Authorization ко всем запросам через authHeaders().
+// Если бэк ждёт токен в другом виде (cookie-сессия, другой заголовок) —
+// поменять нужно только здесь, остальной api/* не изменится.
+const TOKEN_KEY = 'automl_token';
+
+export function getToken(): string | null {
+  return localStorage.getItem(TOKEN_KEY);
+}
+
+export function setToken(token: string | null): void {
+  if (token) {
+    localStorage.setItem(TOKEN_KEY, token);
+  } else {
+    localStorage.removeItem(TOKEN_KEY);
+  }
+}
+
+export function authHeaders(): HeadersInit {
+  const token = getToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}

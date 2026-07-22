@@ -1,4 +1,4 @@
-import { API_URL, readError } from './client';
+import { API_URL, authHeaders, readError } from './client';
 
 export const ALLOWED_EXTENSIONS = ['.zip', '.jar', '.tar', '.tgz', '.tar.gz', '.rar', '.7z'];
 
@@ -13,6 +13,7 @@ export async function inspectDataset(file: File): Promise<string[]> {
 
   const response = await fetch(`${API_URL}/api/datasets/inspect`, {
     method: 'POST',
+    headers: authHeaders(),
     body: formData,
   });
   if (!response.ok) {

@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { getTask } from '../api';
-import type { TaskResult } from '../types';
+import type { TaskResult, TaskStatus } from '../types';
 
 const POLL_INTERVAL_MS = 3000;
-const TERMINAL_STATUSES: TaskResult['status'][] = ['completed', 'failed'];
+const TERMINAL_STATUSES: TaskStatus[] = ['completed', 'failed'];
 
 export function useTaskPolling(
   task: TaskResult | null,
