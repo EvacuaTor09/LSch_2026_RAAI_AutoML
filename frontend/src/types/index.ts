@@ -11,6 +11,35 @@ export type SplitConfig = {
   classes: Record<string, SplitRatio>;
 };
 
+export type MetricName = 'accuracy' | 'f1' | 'precision' | 'recall' | 'loss';
+
+export type AdvancedParams = {
+  learning_rate: number;
+  epochs: number;
+  batch_size: number;
+};
+
+export type EpochMetric = {
+  epoch: number;
+  train_loss: number;
+  val_loss: number;
+  train_acc: number;
+  val_acc: number;
+};
+
+export type ConfusionMatrix = {
+  labels: string[];
+  matrix: number[][];
+};
+
+export type CreateTaskInput = {
+  archive: File;
+  models: ModelName[];
+  splitConfig: SplitConfig;
+  primaryMetric?: MetricName;
+  advanced?: AdvancedParams;
+};
+
 export type TaskResult = {
   id: string;
   status: 'queued' | 'running' | 'completed' | 'failed';
@@ -25,5 +54,8 @@ export type TaskResult = {
     accuracy: number;
     params: Record<string, string>;
     error?: string;
+    metrics?: Record<MetricName, number>;
+    history?: EpochMetric[];
+    confusion_matrix?: ConfusionMatrix;
   }>;
 };

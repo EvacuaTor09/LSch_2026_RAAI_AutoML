@@ -1,2 +1,2 @@
 export { ALLOWED_EXTENSIONS, isAllowedArchive, inspectDataset } from './datasets';
-export { createTask, getTask } from './tasks';
+export { createTask, getTask, downloadWeights, triggerDownload } from './tasks';
