@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { createTask } from '../api';
+import { useCallback, useEffect, useState } from 'react';
+import { createTask, listTasks } from '../api';
 import { useAuth } from '../auth/AuthContext';
 import { DatasetPanel } from '../components/DatasetPanel';
 import { ModelsPanel } from '../components/ModelsPanel';
@@ -12,6 +12,15 @@ import type { AdvancedParams, MetricName, ModelName, SplitRatio, TaskResult } fr
 
 const ALL_MODELS: ModelName[] = ['resnet50', 'vgg16', 'vit_base_patch16_224'];
 
+function upsertTask(list: TaskResult[], next: TaskResult): TaskResult[] {
+  const without = list.filter((item) => item.id !== next.id);
+  return [next, ...without].sort((a, b) => {
+    const aTime = a.created_at ? Date.parse(a.created_at) : 0;
+    const bTime = b.created_at ? Date.parse(b.created_at) : 0;
+    return bTime - aTime;
+  });
+}
+
 export function DashboardPage() {
   const { user, logout, skipAuth } = useAuth();
   const { archive, classes, selectArchive, inspectArchive } = useDatasetUpload();
@@ -22,19 +31,49 @@ export function DashboardPage() {
   const [primaryMetric, setPrimaryMetric] = useState<MetricName>('f1');
   const [advanced, setAdvanced] = useState<AdvancedParams | undefined>(undefined);
 
+  const [tasks, setTasks] = useState<TaskResult[]>([]);
   const [task, setTask] = useState<TaskResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
 
-  useTaskPolling(task, setTask, setError);
+  const handleTaskUpdate = useCallback((next: TaskResult) => {
+    setTask(next);
+    setTasks((current) => upsertTask(current, next));
+  }, []);
+
+  useTaskPolling(task, handleTaskUpdate, setError);
+
+  useEffect(() => {
+    let active = true;
+    async function loadTasks() {
+      try {
+        const items = await listTasks();
+        if (!active) return;
+        setTasks(items);
+        setTask((current) => {
+          if (current) {
+            return items.find((item) => item.id === current.id) ?? current;
+          }
+          return items[0] ?? null;
+        });
+      } catch (loadError) {
+        if (active) {
+          setError(loadError instanceof Error ? loadError.message : 'Не удалось загрузить задачи');
+        }
+      }
+    }
+    void loadTasks();
+    return () => {
+      active = false;
+    };
+  }, [user?.username]);
 
   function handleSelectArchive(file: File | null) {
     if (!file) return;
     const validationError = selectArchive(file);
     setStatus('');
     setError(validationError ?? '');
-    setTask(null);
     setClassSplits({});
   }
 
@@ -48,6 +87,14 @@ export function DashboardPage() {
 
   function handleResetClassSplits() {
     setClassSplits({});
+  }
+
+  function handleSelectTask(taskId: string) {
+    const selected = tasks.find((item) => item.id === taskId);
+    if (!selected) return;
+    setTask(selected);
+    setStatus(`Открыта задача ${selected.id}`);
+    setError('');
   }
 
   async function handleInspect() {
@@ -84,6 +131,7 @@ export function DashboardPage() {
         primaryMetric,
         advanced,
       });
+      setTasks((current) => upsertTask(current, created));
       setTask(created);
       setStatus(`Задача ${created.id} поставлена в очередь`);
     } catch (createError) {
@@ -154,7 +202,13 @@ export function DashboardPage() {
 
         <PredictPanel task={task} />
 
-        <TaskStatusPanel status={status} error={error} task={task} />
+        <TaskStatusPanel
+          status={status}
+          error={error}
+          task={task}
+          tasks={tasks}
+          onSelectTask={handleSelectTask}
+        />
       </main>
     </div>
   );

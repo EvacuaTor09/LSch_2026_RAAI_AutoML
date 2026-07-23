@@ -170,8 +170,15 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	username, _ := auth.UsernameFromContext(r.Context())
+	if username == "" {
+		writeError(w, http.StatusUnauthorized, fmt.Errorf("authentication required"))
+		return
+	}
+
 	task := domain.Task{
 		ID:             taskID,
+		Owner:          username,
 		CreatedAt:      time.Now().UTC(),
 		Status:         domain.StatusQueued,
 		Models:         models,
@@ -197,7 +204,12 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) ListTasks(w http.ResponseWriter, r *http.Request) {
-	tasks, err := h.store.List(r.Context())
+	username, _ := auth.UsernameFromContext(r.Context())
+	if username == "" {
+		writeError(w, http.StatusUnauthorized, fmt.Errorf("authentication required"))
+		return
+	}
+	tasks, err := h.store.List(r.Context(), username)
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, err)
 		return
@@ -212,9 +224,9 @@ func (h *Handlers) GetTask(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	task, err := h.store.Get(r.Context(), id)
+	task, err := h.getOwnedTask(r, id)
 	if err != nil {
-		writeError(w, http.StatusNotFound, fmt.Errorf("task not found"))
+		writeError(w, statusFromTaskAccessError(err), err)
 		return
 	}
 	writeJSON(w, http.StatusOK, task)
@@ -231,9 +243,9 @@ func (h *Handlers) PredictTask(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, fmt.Errorf("task not found"))
 		return
 	}
-	task, err := h.store.Get(r.Context(), id)
+	task, err := h.getOwnedTask(r, id)
 	if err != nil {
-		writeError(w, http.StatusNotFound, fmt.Errorf("task not found"))
+		writeError(w, statusFromTaskAccessError(err), err)
 		return
 	}
 	file, header, err := r.FormFile("file")
@@ -379,6 +391,34 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 
 func writeError(w http.ResponseWriter, status int, err error) {
 	writeJSON(w, status, map[string]string{"error": err.Error()})
+}
+
+var errTaskForbidden = fmt.Errorf("task not found")
+
+func (h *Handlers) getOwnedTask(r *http.Request, id string) (domain.Task, error) {
+	username, _ := auth.UsernameFromContext(r.Context())
+	if username == "" {
+		return domain.Task{}, fmt.Errorf("authentication required")
+	}
+	task, err := h.store.Get(r.Context(), id)
+	if err != nil {
+		return domain.Task{}, fmt.Errorf("task not found")
+	}
+	// Legacy tasks without owner are visible only until reassigned; new tasks always have owner.
+	if task.Owner != "" && task.Owner != username {
+		return domain.Task{}, errTaskForbidden
+	}
+	return task, nil
+}
+
+func statusFromTaskAccessError(err error) int {
+	if err == nil {
+		return http.StatusOK
+	}
+	if strings.Contains(err.Error(), "authentication required") {
+		return http.StatusUnauthorized
+	}
+	return http.StatusNotFound
 }
 
 func modelEndpoint(task domain.Task, modelName string) string {

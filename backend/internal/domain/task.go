@@ -33,6 +33,7 @@ type AdvancedParams struct {
 
 type Task struct {
 	ID             string            `json:"id"`
+	Owner          string            `json:"owner"`
 	CreatedAt      time.Time         `json:"created_at"`
 	Status         TaskStatus        `json:"status"`
 	Models         []ModelName       `json:"models"`

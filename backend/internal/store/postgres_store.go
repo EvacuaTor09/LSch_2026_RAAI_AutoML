@@ -54,7 +54,7 @@ func (s *PostgresStore) Update(ctx context.Context, task domain.Task) error {
 
 func (s *PostgresStore) Get(ctx context.Context, id string) (domain.Task, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT id, created_at, status, models, dataset_path, archive_path,
+		SELECT id, owner, created_at, status, models, dataset_path, archive_path,
 			split_config, class_names, advanced_params, results, best_model, best_accuracy,
 			best_params, error, completed_at
 		FROM tasks
@@ -63,14 +63,21 @@ func (s *PostgresStore) Get(ctx context.Context, id string) (domain.Task, error)
 	return scanTask(row)
 }
 
-func (s *PostgresStore) List(ctx context.Context) ([]domain.Task, error) {
-	rows, err := s.db.QueryContext(ctx, `
-		SELECT id, created_at, status, models, dataset_path, archive_path,
+func (s *PostgresStore) List(ctx context.Context, owner string) ([]domain.Task, error) {
+	query := `
+		SELECT id, owner, created_at, status, models, dataset_path, archive_path,
 			split_config, class_names, advanced_params, results, best_model, best_accuracy,
 			best_params, error, completed_at
 		FROM tasks
-		ORDER BY created_at DESC
-	`)
+	`
+	args := []any{}
+	if owner = strings.TrimSpace(owner); owner != "" {
+		query += ` WHERE owner = $1`
+		args = append(args, owner)
+	}
+	query += ` ORDER BY created_at DESC`
+
+	rows, err := s.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -97,6 +104,7 @@ func (s *PostgresStore) ensureSchema(ctx context.Context) error {
 
 		CREATE TABLE IF NOT EXISTS tasks (
 			id TEXT PRIMARY KEY,
+			owner TEXT NOT NULL DEFAULT '',
 			created_at TIMESTAMPTZ NOT NULL,
 			status TEXT NOT NULL,
 			models TEXT[] NOT NULL,
@@ -114,6 +122,8 @@ func (s *PostgresStore) ensureSchema(ctx context.Context) error {
 		);
 
 		ALTER TABLE tasks ADD COLUMN IF NOT EXISTS advanced_params JSONB;
+		ALTER TABLE tasks ADD COLUMN IF NOT EXISTS owner TEXT NOT NULL DEFAULT '';
+		CREATE INDEX IF NOT EXISTS tasks_owner_created_at_idx ON tasks (owner, created_at DESC);
 	`)
 	return err
 }
@@ -177,15 +187,16 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO tasks (
-			id, created_at, status, models, dataset_path, archive_path,
+			id, owner, created_at, status, models, dataset_path, archive_path,
 			split_config, class_names, advanced_params, results, best_model, best_accuracy,
 			best_params, error, completed_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10, $11, $12,
-			$13, $14, $15
+			$1, $2, $3, $4, $5, $6, $7,
+			$8, $9, $10, $11, $12, $13,
+			$14, $15, $16
 		)
 		ON CONFLICT (id) DO UPDATE SET
+			owner = EXCLUDED.owner,
 			created_at = EXCLUDED.created_at,
 			status = EXCLUDED.status,
 			models = EXCLUDED.models,
@@ -202,6 +213,7 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 			completed_at = EXCLUDED.completed_at
 	`,
 		task.ID,
+		task.Owner,
 		task.CreatedAt,
 		string(task.Status),
 		models,
@@ -223,6 +235,7 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error) {
 	var (
 		id            string
+		owner         string
 		createdAt     time.Time
 		status        string
 		modelsRaw     any
@@ -241,6 +254,7 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 
 	if err := scanner.Scan(
 		&id,
+		&owner,
 		&createdAt,
 		&status,
 		&modelsRaw,
@@ -309,6 +323,7 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 
 	return domain.Task{
 		ID:             id,
+		Owner:          owner,
 		CreatedAt:      createdAt,
 		Status:         domain.TaskStatus(status),
 		Models:         modelNames,

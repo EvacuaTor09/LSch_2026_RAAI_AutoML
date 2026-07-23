@@ -69,7 +69,7 @@ func recoverQueueBacklog(
 		}
 	}
 
-	tasks, err := taskStore.List(ctx)
+	tasks, err := taskStore.List(ctx, "")
 	if err != nil {
 		return err
 	}

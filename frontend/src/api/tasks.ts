@@ -24,6 +24,17 @@ export async function createTask(input: CreateTaskInput): Promise<TaskResult> {
   return (await response.json()) as TaskResult;
 }
 
+export async function listTasks(): Promise<TaskResult[]> {
+  const response = await fetch(`${API_URL}/api/tasks`, {
+    headers: authHeaders(),
+  });
+  if (!response.ok) {
+    throw new Error(await readError(response));
+  }
+  const payload = (await response.json()) as { items?: TaskResult[] };
+  return payload.items ?? [];
+}
+
 export async function getTask(taskId: string): Promise<TaskResult> {
   const response = await fetch(`${API_URL}/api/tasks/${taskId}`, {
     headers: authHeaders(),

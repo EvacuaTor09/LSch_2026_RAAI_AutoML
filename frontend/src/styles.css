@@ -470,6 +470,56 @@ button:focus-visible,
 
 /* -- results -- */
 
+.task-history {
+  margin-bottom: 1.25rem;
+}
+
+.task-history-list {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.task-history-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) auto minmax(0, 1fr);
+  gap: 0.75rem;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: rgba(255, 255, 255, 0.65);
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
+.task-history-item:hover {
+  border-color: rgba(15, 118, 110, 0.35);
+}
+
+.task-history-item.is-active {
+  border-color: rgba(15, 118, 110, 0.55);
+  box-shadow: 0 0 0 1px var(--accent-soft);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.task-history-id {
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.task-history-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+
 .result-top {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

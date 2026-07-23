@@ -88,6 +88,8 @@ export type ModelResult = {
 
 export type TaskResult = {
   id: string;
+  owner?: string;
+  created_at?: string;
   status: TaskStatus;
   models: ModelName[];
   class_names: string[];
