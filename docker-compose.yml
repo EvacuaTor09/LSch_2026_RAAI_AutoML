@@ -5,8 +5,9 @@ x-model-base: &model-base
   restart: unless-stopped
   healthcheck:
     test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
-    interval: 10s
+    interval: 15m
     timeout: 5s
+    retries: 2
     start_period: 20s
   networks:
     - automl_net
@@ -113,23 +114,23 @@ services:
       backend:
         condition: service_started
       resnet-1:
-        condition: service_healthy
+        condition: service_started
       resnet-2:
-        condition: service_healthy
+        condition: service_started
       resnet-3:
-        condition: service_healthy
+        condition: service_started
       vgg-1:
-        condition: service_healthy
+        condition: service_started
       vgg-2:
-        condition: service_healthy
+        condition: service_started
       vgg-3:
-        condition: service_healthy
+        condition: service_started
       vit-1:
-        condition: service_healthy
+        condition: service_started
       vit-2:
-        condition: service_healthy
+        condition: service_started
       vit-3:
-        condition: service_healthy
+        condition: service_started
     environment:
       DATA_DIR: /app/storage
       POSTGRES_DSN: postgres://automl:automl@postgres:5432/automl?sslmode=disable

@@ -24,10 +24,10 @@ type FishSpec = {
 };
 
 const FISH: FishSpec[] = [
-  { src: fish1, top: '14%', size: 60, duration: 32, delay: -4, direction: 'rtl' },
-  { src: fish2, top: '48%', size: 44, duration: 24, delay: -14, direction: 'ltr' },
-  { src: fish3, top: '70%', size: 52, duration: 38, delay: -22, direction: 'rtl' },
-  { src: fish1, top: '32%', size: 32, duration: 20, delay: -8, direction: 'ltr' },
+  { src: fish1, top: '14%', size: 60, duration: 32, delay: -4, direction: 'ltr' },
+  { src: fish2, top: '48%', size: 44, duration: 24, delay: -14, direction: 'rtl' },
+  { src: fish3, top: '70%', size: 52, duration: 38, delay: -22, direction: 'ltr' },
+  { src: fish1, top: '32%', size: 32, duration: 20, delay: -8, direction: 'rtl' },
 ];
 
 // Пузыри: 16 штук с псевдослучайным, но детерминированным разбросом (без
@@ -65,7 +65,7 @@ export function OceanScene() {
           className={`ocean-fish ocean-fish--${f.direction}`}
           style={{ top: f.top, animationDuration: `${f.duration}s`, animationDelay: `${f.delay}s` }}
         >
-          <span className={`ocean-fish-flip${f.direction === 'ltr' ? ' is-flipped' : ''}`}>
+          <span className={`ocean-fish-flip${f.direction === 'rtl' ? ' is-flipped' : ''}`}>
             <img
               src={f.src}
               width={f.size}
