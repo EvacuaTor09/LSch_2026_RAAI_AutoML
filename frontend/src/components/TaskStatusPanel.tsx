@@ -78,12 +78,6 @@ export function TaskStatusPanel({ status, error, task, tasks, onSelectTask }: Ta
               </strong>
             </div>
           </div>
-          {task.best_params && Object.keys(task.best_params).length > 0 && (
-            <div className="chart-block">
-              <h4>best_params</h4>
-              <pre className="raw-json">{JSON.stringify(task.best_params, null, 2)}</pre>
-            </div>
-          )}
           {task.results?.length ? (
             <div className="result-list">
               {task.results.map((result) => (
