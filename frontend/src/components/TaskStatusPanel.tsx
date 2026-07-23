@@ -26,7 +26,7 @@ export function TaskStatusPanel({ status, error, task }: TaskStatusPanelProps) {
         <div className="result-card">
           <div className="result-top">
             <div>
-              <p className="muted">Task ID</p>
+              <p className="muted">ID задачи</p>
               <strong>{task.id}</strong>
             </div>
             <div>

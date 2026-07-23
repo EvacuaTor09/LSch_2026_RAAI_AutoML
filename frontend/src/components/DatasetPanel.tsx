@@ -1,3 +1,4 @@
+import { ALLOWED_EXTENSIONS } from '../api';
 import { Dropzone } from './Dropzone';
 
 type DatasetPanelProps = {
@@ -14,7 +15,13 @@ export function DatasetPanel({ archive, classes, loading, onSelectArchive, onIns
       <h2>
         <span className="step-badge">1</span>Архив датасета
       </h2>
-      <Dropzone file={archive} onFileSelected={onSelectArchive} disabled={loading} />
+      <Dropzone
+        file={archive}
+        onFileSelected={onSelectArchive}
+        disabled={loading}
+        accept={ALLOWED_EXTENSIONS}
+        prompt="Перетащите архив датасета сюда или нажмите, чтобы выбрать"
+      />
 
       <div className="actions actions--single">
         <button type="button" onClick={onInspect} disabled={loading || !archive}>

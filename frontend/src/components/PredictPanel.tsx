@@ -14,10 +14,6 @@ function formatPercent(value?: number): string {
   return typeof value === 'number' && !Number.isNaN(value) ? `${Math.round(value * 10000) / 100}%` : '—';
 }
 
-// Раньше этой панели не существовало вообще — ни predict на уже обученной
-// модели из завершённой задачи, ни predict на голой ImageNet-модели без
-// какого-либо обучения. У бэка обе ручки реально есть (predictTask,
-// predictPretrained), их и подключаем.
 export function PredictPanel({ task }: PredictPanelProps) {
   const useTrained = Boolean(task && task.status === 'completed');
   const availableModels = useTrained && task ? task.models : ALL_MODELS;
@@ -35,6 +31,18 @@ export function PredictPanel({ task }: PredictPanelProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task, useTrained]);
 
+  function handleModelChange(next: string) {
+    setModel(next);
+    setResult(null);
+    setError('');
+  }
+
+  function handleFileSelected(next: File) {
+    setFile(next);
+    setResult(null);
+    setError('');
+  }
+
   async function handlePredict() {
     if (!file) {
       setError('Выберите изображение для предсказания');
@@ -49,7 +57,7 @@ export function PredictPanel({ task }: PredictPanelProps) {
           : await predictPretrained({ model: model as ModelName, file });
       setResult(response);
     } catch (predictError) {
-      setError(predictError instanceof Error ? predictError.message : 'Не удалось выполнить predict');
+      setError(predictError instanceof Error ? predictError.message : 'Не удалось выполнить предсказание');
     } finally {
       setBusy(false);
     }
@@ -58,18 +66,18 @@ export function PredictPanel({ task }: PredictPanelProps) {
   return (
     <section className="panel wide">
       <h2>
-        <span className="step-badge">4</span>Predict
+        <span className="step-badge">4</span>Предсказание
       </h2>
       <p className="field-hint">
         {useTrained
           ? 'Предсказание дообученной моделью из завершённой задачи.'
-          : 'Пока нет завершённой задачи — используется ImageNet pretrained. После обучения переключится на модель из задачи.'}
+          : 'Пока нет завершённой задачи, используется ImageNet pretrained. После обучения переключится на модель из задачи.'}
       </p>
 
       <div className="split-row">
         <label className="text-field">
           Модель
-          <select value={model} onChange={(e) => setModel(e.target.value)}>
+          <select value={model} onChange={(e) => handleModelChange(e.target.value)}>
             {availableModels.map((m) => (
               <option key={m} value={m}>
                 {m}
@@ -79,13 +87,17 @@ export function PredictPanel({ task }: PredictPanelProps) {
         </label>
       </div>
 
-      <Dropzone file={file} onFileSelected={setFile} disabled={busy} />
-      {/* Валидация расширений картинки здесь мягкая — сервер всё равно провалидирует MIME/содержимое. */}
-      <p className="field-hint">Ожидаются изображения: {IMAGE_EXTENSIONS.join(', ')}</p>
+      <Dropzone
+        file={file}
+        onFileSelected={handleFileSelected}
+        disabled={busy}
+        accept={IMAGE_EXTENSIONS}
+        prompt="Перетащите изображение сюда или нажмите, чтобы выбрать"
+      />
 
       <div className="actions actions--single">
         <button type="button" className="primary" onClick={handlePredict} disabled={busy}>
-          {busy ? 'Считаю…' : 'Predict'}
+          {busy ? 'Считаю…' : 'Предсказать'}
         </button>
       </div>
 
@@ -95,7 +107,7 @@ export function PredictPanel({ task }: PredictPanelProps) {
         <div className="result-item" style={{ marginTop: '1rem' }}>
           <div className="result-item-head">
             <strong>{result.class_name}</strong>
-            <span className="metric-pill">{formatPercent(result.confidence)} confidence</span>
+            <span className="metric-pill">{formatPercent(result.confidence)} уверенность</span>
           </div>
           {result.top_predictions?.length ? (
             <div className="metric-list">
