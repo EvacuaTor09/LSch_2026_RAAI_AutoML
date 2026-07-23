@@ -1,21 +1,32 @@
 import { useRef, useState } from 'react';
 import type { DragEvent } from 'react';
-import { ALLOWED_EXTENSIONS, isAllowedArchive } from '../api';
 
 interface DropzoneProps {
   file: File | null;
   onFileSelected: (file: File) => void;
   disabled?: boolean;
+  // Список расширений, которые принимает конкретный дропзон (архивы датасета,
+  // изображения для predict и т.д.) — раньше это было зашито в самом
+  // компоненте только под архивы, из-за чего в PredictPanel нельзя было
+  // выбрать картинку: любой файл проверялся как архив и отклонялся.
+  accept: string[];
+  // Текст-подсказка внутри пустой зоны, например "Перетащите архив датасета…".
+  prompt: string;
 }
 
-export function Dropzone({ file, onFileSelected, disabled }: DropzoneProps) {
+function isAllowedFile(file: File, accept: string[]): boolean {
+  const name = file.name.toLowerCase();
+  return accept.some((extension) => name.endsWith(extension.toLowerCase()));
+}
+
+export function Dropzone({ file, onFileSelected, disabled, accept, prompt }: DropzoneProps) {
   const [dragOver, setDragOver] = useState(false);
   const [error, setError] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   function validateAndSet(candidate: File) {
-    if (!isAllowedArchive(candidate)) {
-      setError(`Неверный формат файла. Ожидается: ${ALLOWED_EXTENSIONS.join(', ')}`);
+    if (!isAllowedFile(candidate, accept)) {
+      setError(`Неверный формат файла. Ожидается: ${accept.join(', ')}`);
       return;
     }
     setError('');
@@ -51,7 +62,7 @@ export function Dropzone({ file, onFileSelected, disabled }: DropzoneProps) {
           ref={inputRef}
           type="file"
           hidden
-          accept={ALLOWED_EXTENSIONS.join(',')}
+          accept={accept.join(',')}
           disabled={disabled}
           onChange={(e) => {
             const selected = e.target.files?.[0];
@@ -71,9 +82,9 @@ export function Dropzone({ file, onFileSelected, disabled }: DropzoneProps) {
           </p>
         ) : (
           <p>
-            Перетащите архив датасета сюда или нажмите, чтобы выбрать
+            {prompt}
             <br />
-            <span className="muted">{ALLOWED_EXTENSIONS.join(', ')}</span>
+            <span className="muted">{accept.join(', ')}</span>
           </p>
         )}
       </div>

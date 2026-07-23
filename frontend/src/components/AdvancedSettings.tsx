@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { NumberField } from './NumberField';
+import { ToggleBubbles } from './ToggleBubbles';
 import type { AdvancedParams } from '../types';
 
 const DEFAULTS: AdvancedParams = { learning_rate: 0.001, epochs: 10, batch_size: 32 };
@@ -36,6 +37,7 @@ export function AdvancedSettings({ value, onChange }: AdvancedSettingsProps) {
         <span className="toggle-switch">
           <input type="checkbox" checked={enabled} onChange={(e) => handleToggle(e.target.checked)} />
           <span className="toggle-track" aria-hidden="true" />
+          <ToggleBubbles />
         </span>
         <span className="toggle-label">
           <strong>Расширенный режим</strong>

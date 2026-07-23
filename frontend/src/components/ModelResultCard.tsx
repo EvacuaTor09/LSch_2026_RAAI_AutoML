@@ -46,24 +46,24 @@ export function ModelResultCard({ result, isBest }: ModelResultCardProps) {
       </div>
 
       <div className="metric-list">
-        <span className="metric-pill">accuracy: {formatPercent(result.accuracy)}</span>
-        <span className="metric-pill">precision: {formatPercent(result.precision)}</span>
-        <span className="metric-pill">recall: {formatPercent(result.recall)}</span>
-        <span className="metric-pill">f1: {formatPercent(result.f1_score)}</span>
-        <span className="metric-pill">best_val_acc: {formatPercent(result.best_val_acc)}</span>
-        <span className="metric-pill">training_time: {formatDuration(result.training_time)}</span>
-        <span className="metric-pill">epochs_trained: {formatNumber(result.epochs_trained)}</span>
-        <span className="metric-pill">best_epoch: {formatNumber(result.best_epoch)}</span>
-        <span className="metric-pill">num_params: {formatNumber(result.num_params)}</span>
-        <span className="metric-pill">trainable_params: {formatNumber(result.trainable_params)}</span>
-        <span className="metric-pill">model_size_mb: {formatFloat(result.model_size_mb)}</span>
+        <span className="metric-pill">Accuracy: {formatPercent(result.accuracy)}</span>
+        <span className="metric-pill">Precision: {formatPercent(result.precision)}</span>
+        <span className="metric-pill">Recall: {formatPercent(result.recall)}</span>
+        <span className="metric-pill">F1: {formatPercent(result.f1_score)}</span>
+        <span className="metric-pill">Лучший val accuracy: {formatPercent(result.best_val_acc)}</span>
+        <span className="metric-pill">Время обучения: {formatDuration(result.training_time)}</span>
+        <span className="metric-pill">Эпох обучено: {formatNumber(result.epochs_trained)}</span>
+        <span className="metric-pill">Лучшая эпоха: {formatNumber(result.best_epoch)}</span>
+        <span className="metric-pill">Всего параметров: {formatNumber(result.num_params)}</span>
+        <span className="metric-pill">Обучаемых параметров: {formatNumber(result.trainable_params)}</span>
+        <span className="metric-pill">Размер модели: {formatFloat(result.model_size_mb)} МБ</span>
       </div>
 
       {(result.endpoint || result.weights_file) && (
         <p className="field-hint">
-          {result.endpoint && <>endpoint: {result.endpoint}</>}
+          {result.endpoint && <>эндпоинт: {result.endpoint}</>}
           {result.endpoint && result.weights_file && ' · '}
-          {result.weights_file && <>weights_file: {result.weights_file}</>}
+          {result.weights_file && <>файл весов: {result.weights_file}</>}
         </p>
       )}
 

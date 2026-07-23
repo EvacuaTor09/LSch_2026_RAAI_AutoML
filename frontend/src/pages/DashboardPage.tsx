@@ -145,7 +145,7 @@ export function DashboardPage() {
     <div className="shell">
       <header className="hero">
         <div>
-          <p className="eyebrow">{skipAuth ? 'локальный режим' : 'Аквариум · AutoML orchestration'}</p>
+          <p className="eyebrow">{skipAuth ? 'локальный режим' : 'Аквариум · AutoML-оркестрация'}</p>
           <h1>Панель обучения моделей</h1>
           <p className="lead">
             Загрузите архив с датасетом, выберите модели и параметры обучения — оркестратор поднимет отдельный
@@ -158,7 +158,7 @@ export function DashboardPage() {
             <strong>{user?.username ?? 'вы'}</strong>
           </div>
           <div className="stat">
-            <span>Split по умолчанию</span>
+            <span>Разбиение по умолчанию</span>
             <strong>
               {split.train}/{split.val}/{split.test}
             </strong>
@@ -168,7 +168,7 @@ export function DashboardPage() {
               Выйти
             </button>
           ) : (
-            <p className="field-hint">Auth отключён — VITE_SKIP_AUTH=true</p>
+            <p className="field-hint"></p>
           )}
         </div>
       </header>

@@ -31,11 +31,11 @@ export function AuthForm({ title, submitLabel, pendingLabel, onSubmit, footer }:
   return (
     <div className="auth-shell">
       <form className="auth-card panel" onSubmit={handleSubmit}>
-        <p className="eyebrow">AutoML orchestration</p>
+        <p className="eyebrow">AutoML-оркестрация</p>
         <h1 className="auth-title">{title}</h1>
 
         <label className="text-field">
-          Username
+          Имя пользователя
           <input
             type="text"
             required
