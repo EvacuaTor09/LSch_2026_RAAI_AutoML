@@ -141,6 +141,28 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	var advancedParams *domain.AdvancedParams
+	if raw := strings.TrimSpace(r.FormValue("advanced_params")); raw != "" {
+		var params domain.AdvancedParams
+		if err := json.Unmarshal([]byte(raw), &params); err != nil {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("invalid advanced_params: %w", err))
+			return
+		}
+		if params.Epochs < 1 {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("advanced_params.epochs must be >= 1"))
+			return
+		}
+		if params.BatchSize < 1 {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("advanced_params.batch_size must be >= 1"))
+			return
+		}
+		if params.LearningRate <= 0 {
+			writeError(w, http.StatusBadRequest, fmt.Errorf("advanced_params.learning_rate must be > 0"))
+			return
+		}
+		advancedParams = &params
+	}
+
 	taskID := fmt.Sprintf("task-%d", time.Now().UTC().UnixNano())
 	taskDir, classes, err := h.dataset.Prepare(taskID, archivePath, splitConfig)
 	if err != nil {
@@ -149,14 +171,15 @@ func (h *Handlers) CreateTask(w http.ResponseWriter, r *http.Request) {
 	}
 
 	task := domain.Task{
-		ID:          taskID,
-		CreatedAt:   time.Now().UTC(),
-		Status:      domain.StatusQueued,
-		Models:      models,
-		DatasetPath: taskDir,
-		ArchivePath: archivePath,
-		SplitConfig: splitConfig,
-		ClassNames:  classes,
+		ID:             taskID,
+		CreatedAt:      time.Now().UTC(),
+		Status:         domain.StatusQueued,
+		Models:         models,
+		DatasetPath:    taskDir,
+		ArchivePath:    archivePath,
+		SplitConfig:    splitConfig,
+		ClassNames:     classes,
+		AdvancedParams: advancedParams,
 	}
 	if err := h.store.Create(r.Context(), task); err != nil {
 		writeError(w, http.StatusInternalServerError, err)

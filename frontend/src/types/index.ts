@@ -91,6 +91,7 @@ export type TaskResult = {
   status: TaskStatus;
   models: ModelName[];
   class_names: string[];
+  advanced_params?: AdvancedParams;
   best_model?: string;
   best_accuracy?: number;
   best_params?: Record<string, string>;

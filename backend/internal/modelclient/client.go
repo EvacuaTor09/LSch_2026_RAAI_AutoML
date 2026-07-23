@@ -47,12 +47,32 @@ func (c *Client) Train(ctx context.Context, task domain.Task, modelName domain.M
 	defer release()
 	log.Printf("modelclient: task=%s model=%s acquired replica endpoint=%s", task.ID, modelName, endpoint)
 
+	epochs := c.cfg.TrainEpochs
+	learningRate := c.cfg.LearningRate
+	batchSize := c.cfg.BatchSize
+	if p := task.AdvancedParams; p != nil {
+		if p.Epochs > 0 {
+			epochs = p.Epochs
+		}
+		if p.LearningRate > 0 {
+			learningRate = p.LearningRate
+		}
+		if p.BatchSize > 0 {
+			batchSize = p.BatchSize
+		}
+	}
+
+	log.Printf(
+		"modelclient: task=%s model=%s train epochs=%d lr=%g batch=%d endpoint=%s",
+		task.ID, modelName, epochs, learningRate, batchSize, endpoint,
+	)
+
 	requestPayload := map[string]any{
 		"task_id":       task.ID,
 		"dataset_path":  task.DatasetPath,
-		"epochs":        c.cfg.TrainEpochs,
-		"learning_rate": c.cfg.LearningRate,
-		"batch_size":    c.cfg.BatchSize,
+		"epochs":        epochs,
+		"learning_rate": learningRate,
+		"batch_size":    batchSize,
 		"image_size":    c.cfg.ImageSize,
 		"class_names":   task.ClassNames,
 		"num_classes":   len(task.ClassNames),

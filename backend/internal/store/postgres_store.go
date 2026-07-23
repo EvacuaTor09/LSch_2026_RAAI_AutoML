@@ -55,7 +55,7 @@ func (s *PostgresStore) Update(ctx context.Context, task domain.Task) error {
 func (s *PostgresStore) Get(ctx context.Context, id string) (domain.Task, error) {
 	row := s.db.QueryRowContext(ctx, `
 		SELECT id, created_at, status, models, dataset_path, archive_path,
-			split_config, class_names, results, best_model, best_accuracy,
+			split_config, class_names, advanced_params, results, best_model, best_accuracy,
 			best_params, error, completed_at
 		FROM tasks
 		WHERE id = $1
@@ -66,7 +66,7 @@ func (s *PostgresStore) Get(ctx context.Context, id string) (domain.Task, error)
 func (s *PostgresStore) List(ctx context.Context) ([]domain.Task, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, created_at, status, models, dataset_path, archive_path,
-			split_config, class_names, results, best_model, best_accuracy,
+			split_config, class_names, advanced_params, results, best_model, best_accuracy,
 			best_params, error, completed_at
 		FROM tasks
 		ORDER BY created_at DESC
@@ -104,13 +104,16 @@ func (s *PostgresStore) ensureSchema(ctx context.Context) error {
 			archive_path TEXT NOT NULL,
 			split_config JSONB NOT NULL,
 			class_names TEXT[] NOT NULL,
+			advanced_params JSONB,
 			results JSONB NOT NULL DEFAULT '[]'::jsonb,
 			best_model TEXT NOT NULL DEFAULT '',
 			best_accuracy DOUBLE PRECISION NOT NULL DEFAULT 0,
 			best_params JSONB NOT NULL DEFAULT '{}'::jsonb,
 			error TEXT NOT NULL DEFAULT '',
 			completed_at TIMESTAMPTZ
-		)
+		);
+
+		ALTER TABLE tasks ADD COLUMN IF NOT EXISTS advanced_params JSONB;
 	`)
 	return err
 }
@@ -159,6 +162,10 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 	if err != nil {
 		return err
 	}
+	advancedJSON, err := json.Marshal(task.AdvancedParams)
+	if err != nil {
+		return err
+	}
 	resultsJSON, err := json.Marshal(task.Results)
 	if err != nil {
 		return err
@@ -171,12 +178,12 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 	_, err = s.db.ExecContext(ctx, `
 		INSERT INTO tasks (
 			id, created_at, status, models, dataset_path, archive_path,
-			split_config, class_names, results, best_model, best_accuracy,
+			split_config, class_names, advanced_params, results, best_model, best_accuracy,
 			best_params, error, completed_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10, $11,
-			$12, $13, $14
+			$7, $8, $9, $10, $11, $12,
+			$13, $14, $15
 		)
 		ON CONFLICT (id) DO UPDATE SET
 			created_at = EXCLUDED.created_at,
@@ -186,6 +193,7 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 			archive_path = EXCLUDED.archive_path,
 			split_config = EXCLUDED.split_config,
 			class_names = EXCLUDED.class_names,
+			advanced_params = EXCLUDED.advanced_params,
 			results = EXCLUDED.results,
 			best_model = EXCLUDED.best_model,
 			best_accuracy = EXCLUDED.best_accuracy,
@@ -201,6 +209,7 @@ func (s *PostgresStore) save(ctx context.Context, task domain.Task) error {
 		task.ArchivePath,
 		splitJSON,
 		classNames,
+		advancedJSON,
 		resultsJSON,
 		task.BestModel,
 		task.BestAccuracy,
@@ -221,6 +230,7 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 		archivePath   string
 		splitRaw      []byte
 		classNamesRaw any
+		advancedRaw   []byte
 		resultsRaw    []byte
 		bestModel     string
 		bestAccuracy  float64
@@ -238,6 +248,7 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 		&archivePath,
 		&splitRaw,
 		&classNamesRaw,
+		&advancedRaw,
 		&resultsRaw,
 		&bestModel,
 		&bestAccuracy,
@@ -265,6 +276,14 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 			return domain.Task{}, err
 		}
 	}
+	var advancedParams *domain.AdvancedParams
+	if len(advancedRaw) > 0 && string(advancedRaw) != "null" {
+		var params domain.AdvancedParams
+		if err := json.Unmarshal(advancedRaw, &params); err != nil {
+			return domain.Task{}, err
+		}
+		advancedParams = &params
+	}
 	results := make([]domain.ModelResult, 0)
 	if len(resultsRaw) > 0 {
 		if err := json.Unmarshal(resultsRaw, &results); err != nil {
@@ -289,20 +308,21 @@ func scanTask(scanner interface{ Scan(dest ...any) error }) (domain.Task, error)
 	}
 
 	return domain.Task{
-		ID:           id,
-		CreatedAt:    createdAt,
-		Status:       domain.TaskStatus(status),
-		Models:       modelNames,
-		DatasetPath:  datasetPath,
-		ArchivePath:  archivePath,
-		SplitConfig:  splitConfig,
-		ClassNames:   classNames,
-		Results:      results,
-		BestModel:    bestModel,
-		BestAccuracy: bestAccuracy,
-		BestParams:   bestParams,
-		Error:        errorText,
-		CompletedAt:  completed,
+		ID:             id,
+		CreatedAt:      createdAt,
+		Status:         domain.TaskStatus(status),
+		Models:         modelNames,
+		DatasetPath:    datasetPath,
+		ArchivePath:    archivePath,
+		SplitConfig:    splitConfig,
+		ClassNames:     classNames,
+		AdvancedParams: advancedParams,
+		Results:        results,
+		BestModel:      bestModel,
+		BestAccuracy:   bestAccuracy,
+		BestParams:     bestParams,
+		Error:          errorText,
+		CompletedAt:    completed,
 	}, nil
 }
 

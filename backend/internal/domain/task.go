@@ -18,25 +18,35 @@ type SplitRatio struct {
 }
 
 type TaskRequest struct {
-	Models      []ModelName `json:"models"`
-	SplitConfig SplitConfig `json:"split_config"`
+	Models         []ModelName     `json:"models"`
+	SplitConfig    SplitConfig     `json:"split_config"`
+	AdvancedParams *AdvancedParams `json:"advanced_params,omitempty"`
+}
+
+// AdvancedParams — опциональные гиперпараметры с фронта (расширенный режим).
+// Если nil — worker берёт TRAIN_EPOCHS / LEARNING_RATE / BATCH_SIZE из env.
+type AdvancedParams struct {
+	LearningRate float64 `json:"learning_rate"`
+	Epochs       int     `json:"epochs"`
+	BatchSize    int     `json:"batch_size"`
 }
 
 type Task struct {
-	ID           string            `json:"id"`
-	CreatedAt    time.Time         `json:"created_at"`
-	Status       TaskStatus        `json:"status"`
-	Models       []ModelName       `json:"models"`
-	DatasetPath  string            `json:"dataset_path"`
-	ArchivePath  string            `json:"archive_path"`
-	SplitConfig  SplitConfig       `json:"split_config"`
-	ClassNames   []string          `json:"class_names"`
-	Results      []ModelResult     `json:"results,omitempty"`
-	BestModel    string            `json:"best_model,omitempty"`
-	BestAccuracy float64           `json:"best_accuracy,omitempty"`
-	BestParams   map[string]string `json:"best_params,omitempty"`
-	Error        string            `json:"error,omitempty"`
-	CompletedAt  *time.Time        `json:"completed_at,omitempty"`
+	ID             string            `json:"id"`
+	CreatedAt      time.Time         `json:"created_at"`
+	Status         TaskStatus        `json:"status"`
+	Models         []ModelName       `json:"models"`
+	DatasetPath    string            `json:"dataset_path"`
+	ArchivePath    string            `json:"archive_path"`
+	SplitConfig    SplitConfig       `json:"split_config"`
+	ClassNames     []string          `json:"class_names"`
+	AdvancedParams *AdvancedParams   `json:"advanced_params,omitempty"`
+	Results        []ModelResult     `json:"results,omitempty"`
+	BestModel      string            `json:"best_model,omitempty"`
+	BestAccuracy   float64           `json:"best_accuracy,omitempty"`
+	BestParams     map[string]string `json:"best_params,omitempty"`
+	Error          string            `json:"error,omitempty"`
+	CompletedAt    *time.Time        `json:"completed_at,omitempty"`
 }
 
 type ModelResult struct {
