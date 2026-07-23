@@ -40,16 +40,20 @@ body {
   min-height: 100vh;
   color: var(--text);
   font-family: var(--sans);
+  position: relative;
   background:
     radial-gradient(4px 4px at 12% 22%, rgba(255, 255, 255, 0.55), transparent 60%),
     radial-gradient(3px 3px at 78% 64%, rgba(255, 255, 255, 0.45), transparent 60%),
     radial-gradient(3px 3px at 34% 82%, rgba(255, 255, 255, 0.4), transparent 60%),
     radial-gradient(5px 5px at 90% 18%, rgba(255, 255, 255, 0.4), transparent 60%),
-    radial-gradient(ellipse 85% 55% at 12% -10%, rgba(13, 138, 134, 0.18), transparent 55%),
-    radial-gradient(ellipse 65% 45% at 100% 0%, rgba(18, 64, 107, 0.14), transparent 50%),
-    linear-gradient(180deg, #e8f4f3 0%, #dcecea 45%, #eef7f6 100%);
+    radial-gradient(ellipse 85% 55% at 12% -10%, rgba(13, 138, 134, 0.22), transparent 55%),
+    radial-gradient(ellipse 65% 45% at 100% 0%, rgba(18, 64, 107, 0.16), transparent 50%),
+    radial-gradient(ellipse 70% 35% at 50% 118%, rgba(201, 168, 105, 0.18), transparent 60%),
+    linear-gradient(180deg, #eafaf6 0%, #d9f0ec 32%, #bfe3e0 62%, #9fd0d1 84%, #86c0c9 100%);
   background-attachment: fixed;
-  /* лёгкие "пузырьки" светом по фону — держим ненавязчиво, это фон, не декор поверх контента */
+  /* Раньше был плоский почти-белый градиент сверху донизу — теперь он
+     темнеет к низу (глубина), плюс тёплый песочный отблеск снизу-по-центру
+     ближе к --sand, который раньше нигде не читался как акцент. */
 }
 
 h1,
@@ -118,14 +122,15 @@ button:hover:not(:disabled) {
 }
 
 button.primary {
-  background: var(--ink);
+  background: linear-gradient(135deg, var(--ink) 0%, #0f4f5c 100%);
   border-color: transparent;
   color: #fff;
   font-weight: 600;
+  box-shadow: 0 8px 20px rgba(7, 42, 51, 0.25);
 }
 
 button.primary:hover:not(:disabled) {
-  background: #0d161c;
+  background: linear-gradient(135deg, #0d161c 0%, #0c3f49 100%);
 }
 
 button:disabled {
@@ -162,6 +167,8 @@ button:focus-visible,
 /* -- layout -- */
 
 .shell {
+  position: relative;
+  z-index: 1;
   width: min(1180px, calc(100vw - 2rem));
   margin: 0 auto;
   padding: 2.5rem 0 4rem;
@@ -357,6 +364,164 @@ button:focus-visible,
   background: var(--sand);
 }
 
+/* -- ocean scene (фон) -- */
+
+.ocean-scene {
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ocean-rays {
+  position: absolute;
+  inset: -10% -10% auto -10%;
+  height: 55%;
+  background: conic-gradient(
+    from 200deg at 30% 0%,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.12) 8deg,
+    transparent 20deg,
+    transparent 40deg,
+    rgba(255, 255, 255, 0.08) 48deg,
+    transparent 60deg,
+    transparent 100deg,
+    rgba(255, 255, 255, 0.1) 108deg,
+    transparent 120deg
+  );
+  mix-blend-mode: screen;
+  opacity: 0.7;
+  animation: rays-shift 18s ease-in-out infinite alternate;
+}
+
+@keyframes rays-shift {
+  from {
+    transform: translateX(-4%) rotate(0deg);
+  }
+  to {
+    transform: translateX(4%) rotate(2deg);
+  }
+}
+
+.ocean-bubble {
+  position: absolute;
+  bottom: -10%;
+  opacity: 0;
+  animation-name: bubble-rise;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  filter: drop-shadow(0 0 6px rgba(255, 255, 255, 0.3));
+}
+
+@keyframes bubble-rise {
+  0% {
+    transform: translateY(0) translateX(0);
+    opacity: 0;
+  }
+  8% {
+    opacity: 0.55;
+  }
+  92% {
+    opacity: 0.35;
+  }
+  100% {
+    transform: translateY(-120vh) translateX(18px);
+    opacity: 0;
+  }
+}
+
+.ocean-fish {
+  position: absolute;
+  left: 0;
+  will-change: transform;
+}
+
+.ocean-fish--rtl {
+  animation-name: swim-rtl;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+.ocean-fish--ltr {
+  animation-name: swim-ltr;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+}
+
+@keyframes swim-rtl {
+  from {
+    transform: translateX(112vw);
+  }
+  to {
+    transform: translateX(-16vw);
+  }
+}
+
+@keyframes swim-ltr {
+  from {
+    transform: translateX(-16vw);
+  }
+  to {
+    transform: translateX(112vw);
+  }
+}
+
+.ocean-fish-flip {
+  display: inline-block;
+}
+
+.ocean-fish-flip.is-flipped {
+  transform: scaleX(-1);
+}
+
+.ocean-fish-bob {
+  display: block;
+  opacity: 0.85;
+  filter: drop-shadow(0 6px 10px rgba(7, 42, 51, 0.14));
+  animation: fish-bob 2.6s ease-in-out infinite alternate;
+}
+
+@keyframes fish-bob {
+  from {
+    transform: translateY(-6px) rotate(-4deg);
+  }
+  to {
+    transform: translateY(6px) rotate(4deg);
+  }
+}
+
+.ocean-floor {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -6px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  padding: 0 4vw;
+  opacity: 0.75;
+}
+
+.ocean-sway {
+  transform-origin: bottom center;
+  animation: sway 5s ease-in-out infinite;
+}
+
+.ocean-sway--slow {
+  animation-duration: 7s;
+}
+
+@keyframes sway {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(3deg);
+  }
+}
+
 /* -- toggle switches -- */
 
 .toggle-list {
@@ -427,6 +592,50 @@ button:focus-visible,
 
 .toggle-switch input:checked + .toggle-track::before {
   transform: translateX(16px);
+}
+
+.toggle-bubbles {
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  width: 0;
+  height: 0;
+  pointer-events: none;
+}
+
+.toggle-bubble {
+  position: absolute;
+  bottom: 0;
+  left: calc(var(--i) * 7px - 14px);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: radial-gradient(circle at 30% 30%, #fff, var(--accent-soft) 65%, transparent 78%);
+  opacity: 0;
+}
+
+/* Триггер всплеска — сам checked-статус инпута. Как только .toggle-bubble
+   перестаёт попадать под этот селектор (тоггл выключили), animation-name
+   у него пропадает, и при следующем включении CSS-анимация проигрывается
+   с нуля — реализация всплеска без единой строчки JS. */
+.toggle-switch input:checked ~ .toggle-bubbles .toggle-bubble {
+  animation: toggle-bubble-rise 0.85s ease-out;
+  animation-delay: calc(var(--i) * 55ms);
+}
+
+@keyframes toggle-bubble-rise {
+  0% {
+    opacity: 0;
+    transform: translateY(0) scale(0.5);
+  }
+  18% {
+    opacity: 0.95;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-32px) scale(1);
+  }
 }
 
 /* -- chips -- */
@@ -502,6 +711,16 @@ button:focus-visible,
 .status-pill--completed {
   background: var(--accent-soft);
   color: var(--accent);
+  animation: pill-pulse 2.2s ease-out 1;
+}
+
+@keyframes pill-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(13, 138, 134, 0.35);
+  }
+  100% {
+    box-shadow: 0 0 0 10px rgba(13, 138, 134, 0);
+  }
 }
 .status-pill--failed {
   background: var(--danger-soft);
@@ -673,12 +892,26 @@ button:focus-visible,
 }
 
 .best-badge {
-  background: var(--coral);
+  background: linear-gradient(120deg, var(--coral), #f2a35c);
+  background-size: 200% 100%;
+  animation: badge-shimmer 3s ease-in-out infinite;
+}
+
+@keyframes badge-shimmer {
+  0%,
+  100% {
+    background-position: 0% 50%;
+  }
+  50% {
+    background-position: 100% 50%;
+  }
 }
 
 /* -- auth pages -- */
 
 .auth-shell {
+  position: relative;
+  z-index: 1;
   min-height: 100vh;
   display: flex;
   align-items: center;
@@ -737,5 +970,11 @@ button:focus-visible,
 @media (prefers-reduced-motion: reduce) {
   * {
     transition: none !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+
+  .ocean-scene {
+    display: none;
   }
 }

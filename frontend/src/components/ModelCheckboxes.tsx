@@ -1,3 +1,4 @@
+import { ToggleBubbles } from './ToggleBubbles';
 import type { ModelName } from '../types';
 
 const MODELS: { id: ModelName; label: string; hint: string }[] = [
@@ -24,6 +25,7 @@ export function ModelCheckboxes({ selected, onChange }: ModelCheckboxesProps) {
             <span className="toggle-switch">
               <input type="checkbox" checked={selected.includes(m.id)} onChange={() => toggle(m.id)} />
               <span className="toggle-track" aria-hidden="true" />
+              <ToggleBubbles />
             </span>
             <span className="toggle-label">
               <strong>{m.label}</strong>
